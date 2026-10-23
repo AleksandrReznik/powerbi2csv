@@ -1,0 +1,3 @@
+﻿"Pipeline","PipelineId","Stage","Order","Workspace","ItemType","Item","ItemId","SourceItemId","TargetItemId","LastDeploymentTime"
+"Sales pipeline","dp1","Production","1","Sales","Notebook","Load bronze","nb1","src-nb","","2026-09-01T00:00:00Z"
+"Sales pipeline","dp1","Production","1","Sales","Lakehouse","Bronze","lh1","","",""

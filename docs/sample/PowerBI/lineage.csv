@@ -1,0 +1,3 @@
+﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","DependsOnType","DependsOn","DependsOnId","DependsOnWorkspaceId"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Report","Sales overview","r1","SemanticModel","Sales model","d1","aaaaaaaa-0000-0000-0000-000000000001"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","SemanticModel","Sales model","d1","Dataflow","","df1","aaaaaaaa-0000-0000-0000-000000000001"

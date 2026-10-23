@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","Warehouse","WarehouseId","Description","ConnectionString","CreatedDate","LastUpdatedTime","Tables","Views","StoredProcedures","Functions","SqlStatus"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","sales-dw","dw1","","abc.datawarehouse.fabric.microsoft.com","2025-05-01T00:00:00Z","2026-09-01T00:00:00Z","1","2","1","1","Read"

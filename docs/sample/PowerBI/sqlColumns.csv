@@ -1,0 +1,3 @@
+﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","Schema","Table","Column","Ordinal","DataType","Length","Precision","Scale","Nullable"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Warehouse","sales-dw","dw1","dbo","FactSales","Amount","1","decimal","","18","2","YES"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Warehouse","sales-dw","dw1","dbo","FactSales","CustomerKey","2","int","","10","0","NO"

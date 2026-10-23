@@ -1,0 +1,6 @@
+role 'RLS Sales'
+	modelPermission: read
+
+	tablePermission Sales = [Email] = USERPRINCIPALNAME()
+
+	annotation PBI_Id = 1

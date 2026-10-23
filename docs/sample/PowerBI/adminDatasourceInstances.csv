@@ -1,0 +1,2 @@
+﻿"DatasourceId","DatasourceType","GatewayId","ConnectionDetails"
+"dsi1","Sql","gw1","{""server"":""sql1.contoso.com"",""database"":""Sales""}"

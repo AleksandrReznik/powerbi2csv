@@ -1,0 +1,2 @@
+﻿"Pipeline","PipelineId","Description","Stages","Workspaces"
+"Sales pipeline","pl1","dev to prod","2","Finance DEV; Sales"

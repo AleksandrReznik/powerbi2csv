@@ -1,0 +1,9 @@
+expression Reference =
+		let
+		    Source = Sql.Databases("abc.datawarehouse.fabric.microsoft.com"),
+		    db = Source{[Name="sales-dw"]}[Data]
+		in
+		    db
+	lineageTag: 1
+
+	annotation PBI_ResultType = Table

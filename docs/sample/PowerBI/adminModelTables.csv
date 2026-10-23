@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","Model","ModelId","Table","IsHidden","StorageMode","Columns","Measures","Source"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Sales","","","1","1","let Source = Sql.Database(ServerName, ""Sales"") in Source"

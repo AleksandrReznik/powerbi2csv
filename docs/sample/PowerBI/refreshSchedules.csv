@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","Model","ModelId","Kind","Enabled","Days","Times","Frequency","LocalTimeZoneId","NotifyOption"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Import","False","Monday, Friday","05:00","","UTC","MailOnFailure"

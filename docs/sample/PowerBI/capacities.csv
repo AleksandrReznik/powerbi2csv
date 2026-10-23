@@ -1,0 +1,3 @@
+﻿"Capacity","CapacityId","Sku","Region","State","UserAccessRight","Admins","TenantKeyId","Workspaces","Source"
+"cap-prod","cccccccc-0000-0000-0000-000000000001","F64","West Europe","Active","Assign","","","1","Power BI; Fabric"
+"cap-test","cccccccc-0000-0000-0000-000000000002","F2","North Europe","Inactive","","","","0","Fabric"

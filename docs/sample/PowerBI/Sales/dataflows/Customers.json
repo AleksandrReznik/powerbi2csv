@@ -1,0 +1,1 @@
+{"name":"Customers","entities":[{"name":"Customer"}],"pbi:mashup":{"document":"section Section1;\r\nshared Customers = let\r\n  Source = Web.Contents(\"https://api.contoso.com/customers\")\r\nin Source;"}}

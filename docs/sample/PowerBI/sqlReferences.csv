@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","Schema","Object","ReferencedDatabase","ReferencedSchema","ReferencedObject","ReferencedItemType","ReferencedWorkspace"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Warehouse","sales-dw","dw1","dbo","vSales","Bronze","dbo","orders","Lakehouse","Sales"

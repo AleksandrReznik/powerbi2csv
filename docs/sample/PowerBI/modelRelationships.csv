@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","Model","ModelId","Relationship","FromTable","FromColumn","FromCardinality","ToTable","ToColumn","ToCardinality","IsActive","CrossFilteringBehavior","Properties"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Sales[DateKey] -> Date[DateKey]","Sales","","","Date","","","True","","{""[Relationship]"":""Sales[DateKey] -> Date[DateKey]"",""[FromTable]"":""Sales"",""[ToTable]"":""Date"",""[IsActive]"":true}"

@@ -1,0 +1,1 @@
+CREATE PROC dm.load_data_model AS SELECT 1

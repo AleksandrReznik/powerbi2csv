@@ -1,0 +1,11 @@
+table Date
+
+	column Day
+		dataType: dateTime
+
+	partition Date = entity
+		mode: directLake
+		source
+			entityName: dim_date
+			schemaName: gold
+			expressionSource: Reference

@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","Model","ModelId","Table","Measure","DataType","FormatString","IsHidden","DisplayFolder","State","Description","Expression","Properties"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Sales","Total Sales","","","False","","","","SUM(Sales[Amount])","{""[Name]"":""Total Sales"",""[Table]"":""Sales"",""[Expression]"":""SUM(Sales[Amount])"",""[IsHidden]"":false}"

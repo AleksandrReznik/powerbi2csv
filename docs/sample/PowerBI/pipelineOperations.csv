@@ -1,0 +1,2 @@
+﻿"Pipeline","PipelineId","OperationId","Type","Status","ExecutionStartTime","ExecutionEndTime","SourceStageOrder","TargetStageOrder","PerformedBy","Note"
+"Sales pipeline","pl1","op1","Deploy","Succeeded","","","0","1","anna@contoso.com",""

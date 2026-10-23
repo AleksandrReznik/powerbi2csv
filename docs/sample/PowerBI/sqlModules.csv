@@ -1,0 +1,3 @@
+﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","Schema","Object","ObjectType","DefinitionLength","ReferencedDatabases","Definition"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Warehouse","sales-dw","dw1","dbo","vSales","View","57","Bronze","CREATE VIEW dbo.vSales AS SELECT * FROM Bronze.dbo.orders"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Warehouse","sales-dw","dw1","dm","load_data_model","StoredProcedure","42","","CREATE PROC dm.load_data_model AS SELECT 1"

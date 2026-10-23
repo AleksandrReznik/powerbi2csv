@@ -1,0 +1,14 @@
+# Run output: contains tenant data (names, e-mail addresses, connection details, code, .pbix files)
+powerbi2csv_*/
+*.zip
+*.xlsx
+*.PRIVATE*
+
+# Publishing kit (blog post, images, briefs) is not part of the tool
+publish/
+
+# Editors and OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

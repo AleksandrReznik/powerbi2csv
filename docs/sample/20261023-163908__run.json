@@ -1,0 +1,701 @@
+{
+  "tool": "powerbi2csv",
+  "version": "1.0.0",
+  "startedUtc": "2026-10-23T14:39:08Z",
+  "finishedUtc": "2026-10-23T14:39:09Z",
+  "durationSec": 0.4,
+  "host": {
+    "ClouddriveExists": false,
+    "CloudShell": false,
+    "OS": "Windows",
+    "PSEdition": "Core",
+    "AzAccounts": "9.9.9-test",
+    "OutputBase": "C:\\inventory",
+    "PSVersion": "7.6.8"
+  },
+  "tenantId": "11111111-2222-3333-4444-555555555555",
+  "account": "tester@contoso.com",
+  "options": {
+    "profile": "Full",
+    "reports": [],
+    "addReports": [],
+    "skipReports": [],
+    "selected": [
+      "PowerBI",
+      "Fabric",
+      "FabricSql",
+      "Dependencies",
+      "FabricCode",
+      "FabricStorage",
+      "PowerAutomate",
+      "PowerBIModels",
+      "PowerBIAdmin",
+      "PowerBIActivity"
+    ],
+    "datasets": [
+      "PbiWorkspaces",
+      "PowerBI",
+      "Fabric",
+      "FabricSql",
+      "ItemDefinitions",
+      "FabricCode",
+      "FabricStorage",
+      "PowerAutomate",
+      "PowerBIModels",
+      "PowerBIAdmin",
+      "PowerBIActivity"
+    ],
+    "workspaceFilter": [],
+    "excludeWorkspace": [],
+    "personalWorkspaces": false,
+    "refreshHistory": 20,
+    "runHistory": 20,
+    "workspaceListFile": false,
+    "activityDays": 2,
+    "exportMaxSizeMB": 1024,
+    "zip": false,
+    "noExcel": true
+  },
+  "workspaces": {
+    "inScope": 2,
+    "visible": 3
+  },
+  "stages": [
+    {
+      "Stage": "Dataset:PbiWorkspaces",
+      "Status": "Collected",
+      "DurationSec": 0.0,
+      "Note": "2 of 3 visible workspace(s) in scope; \"My workspace\" left out (-PbiIncludePersonalWorkspaces adds it)"
+    },
+    {
+      "Stage": "Dataset:PowerBI",
+      "Status": "Partial",
+      "DurationSec": 0.0,
+      "Note": "2 workspace(s) partly readable with this account"
+    },
+    {
+      "Stage": "Dataset:Fabric",
+      "Status": "Collected",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Dataset:FabricSql",
+      "Status": "Partial",
+      "DurationSec": 0.0,
+      "Note": "1 catalog query(ies) refused: Sales / Gold modules: The SELECT permission was denied on the object sql_modules"
+    },
+    {
+      "Stage": "Dataset:ItemDefinitions",
+      "Status": "Collected",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Dataset:FabricCode",
+      "Status": "Partial",
+      "DurationSec": 0.0,
+      "Note": "7 exported, 2 not exported (see exportIndex.csv)"
+    },
+    {
+      "Stage": "Dataset:FabricStorage",
+      "Status": "Partial",
+      "DurationSec": 0.0,
+      "Note": "1 of 3 not readable: Sales / sales-dw: HTTP 403 AuthorizationPermissionMismatch: This request is not authorized"
+    },
+    {
+      "Stage": "Dataset:PowerAutomate",
+      "Status": "Partial",
+      "DurationSec": 0.0,
+      "Note": "1 environment(s), 1 flow(s); only the flows this account owns or co-owns (all flows need the Power Platform administrator role)"
+    },
+    {
+      "Stage": "Dataset:PowerBIModels",
+      "Status": "Partial",
+      "DurationSec": 0.0,
+      "Note": "1 model(s) not readable: Sales / Unused model: HTTP 400 DatasetExecuteQueriesError: Query execution is disabled"
+    },
+    {
+      "Stage": "Dataset:PowerBIAdmin",
+      "Status": "Collected",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Dataset:PowerBIActivity",
+      "Status": "Collected",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:PowerBI",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:Fabric",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:FabricSql",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:Dependencies",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:FabricCode",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:FabricStorage",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:PowerAutomate",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:PowerBIModels",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:PowerBIAdmin",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    },
+    {
+      "Stage": "Report:PowerBIActivity",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
+    }
+  ],
+  "apiCalls": {
+    "Retries": 0,
+    "flow": 4,
+    "onelake": 6,
+    "pbi": 59,
+    "fabric": 65,
+    "SleepSec": 7.0,
+    "Throttled": 0,
+    "sql": 3
+  },
+  "files": [
+    {
+      "file": "PowerBI/activityEvents.csv",
+      "rows": 3
+    },
+    {
+      "file": "PowerBI/adminApps.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/adminCapacities.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/adminDatasourceInstances.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/adminDomains.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/adminItems.csv",
+      "rows": 3
+    },
+    {
+      "file": "PowerBI/adminItemUsers.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/adminModelExpressions.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/adminModelTables.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/adminWorkspaces.csv",
+      "rows": 3
+    },
+    {
+      "file": "PowerBI/adminWorkspaceUsers.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/appContent.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/apps.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/availableFeatures.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/capacities.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/capacityWorkloads.csv",
+      "rows": 0
+    },
+    {
+      "file": "PowerBI/connections.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/dashboards.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/dashboardTiles.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/dataflowDatasources.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/dataflows.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/dataflowSources.csv",
+      "rows": 4
+    },
+    {
+      "file": "PowerBI/dataflowTransactions.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/deploymentPipelines.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/deploymentRoleAssignments.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/deploymentStageItems.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/deploymentStages.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/domains.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/environmentMatrix.csv",
+      "rows": 0
+    },
+    {
+      "file": "PowerBI/exportIndex.csv",
+      "rows": 9
+    },
+    {
+      "file": "PowerBI/externalDependencies.csv",
+      "rows": 8
+    },
+    {
+      "file": "PowerBI/fabricItems.csv",
+      "rows": 9
+    },
+    {
+      "file": "PowerBI/flowEnvironments.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/flows.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/folders.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/gatewayDatasources.csv",
+      "rows": 0
+    },
+    {
+      "file": "PowerBI/gatewayDatasourceUsers.csv",
+      "rows": 0
+    },
+    {
+      "file": "PowerBI/gateways.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/gitItemStatus.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/itemConnections.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/itemDependencies.csv",
+      "rows": 9
+    },
+    {
+      "file": "PowerBI/itemRuns.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/itemSchedules.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/lakehouses.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/lakehouseTables.csv",
+      "rows": 5
+    },
+    {
+      "file": "PowerBI/lineage.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/managedPrivateEndpoints.csv",
+      "rows": 0
+    },
+    {
+      "file": "PowerBI/modelColumns.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/modelExpressions.csv",
+      "rows": 4
+    },
+    {
+      "file": "PowerBI/modelMeasures.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/modelPartitions.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/modelRelationships.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/modelRoles.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/modelSources.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/modelTables.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/notebookDependencies.csv",
+      "rows": 8
+    },
+    {
+      "file": "PowerBI/onelakeRoles.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/onelakeStorage.csv",
+      "rows": 3
+    },
+    {
+      "file": "PowerBI/onelakeTableSizes.csv",
+      "rows": 3
+    },
+    {
+      "file": "PowerBI/pipelineActivities.csv",
+      "rows": 5
+    },
+    {
+      "file": "PowerBI/pipelineOperations.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/pipelineStageItems.csv",
+      "rows": 4
+    },
+    {
+      "file": "PowerBI/pipelineStages.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/pipelineUsers.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/refreshables.csv",
+      "rows": 0
+    },
+    {
+      "file": "PowerBI/refreshHistory.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/refreshSchedules.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/reportDatasources.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/reportPages.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/reports.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/semanticModelDatasources.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/semanticModelParameters.csv",
+      "rows": 0
+    },
+    {
+      "file": "PowerBI/semanticModels.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/semanticModelUsers.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/shortcuts.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/sparkPools.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/sparkSessions.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/sqlColumns.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/sqlModules.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/sqlObjects.csv",
+      "rows": 11
+    },
+    {
+      "file": "PowerBI/sqlReferences.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/tenantSettings.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/warehouses.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/widelyShared.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/workspaceGit.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/workspaceNetwork.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/workspaceRoleAssignments.csv",
+      "rows": 3
+    },
+    {
+      "file": "PowerBI/workspaces.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/workspaceSparkSettings.csv",
+      "rows": 1
+    },
+    {
+      "file": "PowerBI/workspaceUsers.csv",
+      "rows": 2
+    },
+    {
+      "file": "findings.csv",
+      "rows": 10
+    },
+    {
+      "file": "coverage.csv",
+      "rows": 20
+    }
+  ],
+  "findings": {
+    "High": 2,
+    "Medium": 3,
+    "Low": 2,
+    "Info": 3
+  },
+  "coverage": [
+    {
+      "Area": "Workspaces",
+      "Status": "Collected",
+      "Items": 2,
+      "Detail": "2 of 3 visible workspace(s) in scope; \"My workspace\" left out (-PbiIncludePersonalWorkspaces adds it)"
+    },
+    {
+      "Area": "Power BI workspace Finance DEV",
+      "Status": "Partial",
+      "Items": 0,
+      "Detail": "workspace users: 1 call(s) failed (HTTP 401 PowerBINotAuthorizedException: Unauthorized)"
+    },
+    {
+      "Area": "Power BI workspace Sales",
+      "Status": "Partial",
+      "Items": 6,
+      "Detail": "semantic model users: 1 call(s) failed (HTTP 403 Forbidden: Not the owner)"
+    },
+    {
+      "Area": "Power BI apps, capacities, gateways, pipelines",
+      "Status": "Partial",
+      "Items": 3,
+      "Detail": "capacity workloads (capacity admin): 1 call(s) failed (HTTP 403 Forbidden: Capacity admin only)"
+    },
+    {
+      "Area": "Fabric workspace Finance DEV",
+      "Status": "Collected",
+      "Items": 0,
+      "Detail": ""
+    },
+    {
+      "Area": "Fabric workspace Sales",
+      "Status": "Collected",
+      "Items": 9,
+      "Detail": ""
+    },
+    {
+      "Area": "Fabric connections, gateways, capacities",
+      "Status": "Collected",
+      "Items": 4,
+      "Detail": ""
+    },
+    {
+      "Area": "Fabric SQL endpoints",
+      "Status": "Partial",
+      "Items": 3,
+      "Detail": "1 catalog query(ies) refused: Sales / Gold modules: The SELECT permission was denied on the object sql_modules"
+    },
+    {
+      "Area": "Item definitions: Dataflow",
+      "Status": "Collected",
+      "Items": 1,
+      "Detail": ""
+    },
+    {
+      "Area": "Item definitions: Dataflow (gen1)",
+      "Status": "Collected",
+      "Items": 1,
+      "Detail": ""
+    },
+    {
+      "Area": "Item definitions: DataPipeline",
+      "Status": "Collected",
+      "Items": 1,
+      "Detail": ""
+    },
+    {
+      "Area": "Item definitions: Notebook",
+      "Status": "Collected",
+      "Items": 2,
+      "Detail": ""
+    },
+    {
+      "Area": "Item definitions: SemanticModel",
+      "Status": "Collected",
+      "Items": 1,
+      "Detail": ""
+    },
+    {
+      "Area": "Fabric code download",
+      "Status": "Partial",
+      "Items": 7,
+      "Detail": "7 exported, 2 not exported (see exportIndex.csv)"
+    },
+    {
+      "Area": "OneLake storage",
+      "Status": "Partial",
+      "Items": 2,
+      "Detail": "1 of 3 not readable: Sales / sales-dw: HTTP 403 AuthorizationPermissionMismatch: This request is not authorized"
+    },
+    {
+      "Area": "Power Automate",
+      "Status": "Partial",
+      "Items": 1,
+      "Detail": "1 environment(s), 1 flow(s); only the flows this account owns or co-owns (all flows need the Power Platform administrator role)"
+    },
+    {
+      "Area": "Semantic model schema (DAX INFO.VIEW)",
+      "Status": "Partial",
+      "Items": 1,
+      "Detail": "1 model(s) not readable: Sales / Unused model: HTTP 400 DatasetExecuteQueriesError: Query execution is disabled"
+    },
+    {
+      "Area": "Power BI admin (tenant-wide)",
+      "Status": "Collected",
+      "Items": 3,
+      "Detail": ""
+    },
+    {
+      "Area": "Power BI activity log",
+      "Status": "Collected",
+      "Items": 3,
+      "Detail": "2 day(s)."
+    },
+    {
+      "Area": "Report PowerBIExport",
+      "Status": "NotSelected",
+      "Items": null,
+      "Detail": "PowerBI\\exportIndex.csv, PowerBI\\<workspace>\\reports\\*.pbix, PowerBI\\<workspace>\\<item type>\\<item>\\* (definitions), PowerBI\\<workspace>\\dataflows\\*.json, PowerBI\\<workspace>\\sql\\<database>\\*.sql"
+    }
+  ],
+  "warnings": 0,
+  "errors": []
+}

@@ -1,0 +1,3 @@
+﻿"Workspace","WorkspaceId","State","Provider","Organization","Project","Repository","Branch","Directory","Head","LastSyncTime","ItemStatus","UncommittedItems","IncomingItems","Conflicts","RemoteCommitHash"
+"Finance DEV","aaaaaaaa-0000-0000-0000-000000000002","NotConnected","","","","","","","","","","","","",""
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","ConnectedAndInitialized","AzureDevOps","contoso","BI","sales","main","/","abc123","2026-09-20T00:00:00Z","Read","1","1","0","abc999"

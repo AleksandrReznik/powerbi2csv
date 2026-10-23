@@ -1,0 +1,4 @@
+﻿"Workspace","WorkspaceId","Type","State","IsOnDedicatedCapacity","CapacityId","Description","DefaultStorageFormat","Users","Admins","Items"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Workspace","Active","True","cccccccc-0000-0000-0000-000000000001","","","1","anna@contoso.com","3"
+"Orphaned","aaaaaaaa-0000-0000-0000-000000000009","Workspace","Active","False","","","","0","",""
+"PersonalWorkspace Bob","aaaaaaaa-0000-0000-0000-00000000000a","PersonalGroup","Active","","","","","0","",""

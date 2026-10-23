@@ -1,0 +1,3 @@
+﻿"Workspace","WorkspaceId","DisplayName","Identifier","EmailAddress","PrincipalType","AccessRight","UserType","GraphId"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Anna Admin","anna@contoso.com","anna@contoso.com","User","Admin","","g1"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Vic Viewer","vic@contoso.com","vic@contoso.com","User","Viewer","","g2"

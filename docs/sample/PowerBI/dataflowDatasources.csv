@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","Dataflow","DataflowId","DatasourceType","Name","Server","Database","Url","Path","ConnectionString","GatewayId","GatewayName","DatasourceId","ConnectionDetails"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Customers","df1","Web","","","","https://api.contoso.com/customers","","","","","fds1","{""url"":""https://api.contoso.com/customers""}"

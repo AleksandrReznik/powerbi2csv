@@ -1,0 +1,4 @@
+﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","Schema","Table","Files","Bytes","MB","LastModified"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Lakehouse","Bronze","lh1","","customers","2","1048676","1","2026-09-01T10:00:00Z"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Lakehouse","Bronze","lh1","","orders","2","2000","0","2026-09-02T10:00:00Z"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Lakehouse","Gold","lh2","gold","fact_sales","1","3000","0","2026-09-01T10:00:00Z"

@@ -1,0 +1,3 @@
+﻿"SettingName","Title","TenantSettingGroup","Enabled","CanSpecifySecurityGroups","EnabledSecurityGroups","ExcludedSecurityGroups","DelegateToCapacity","DelegateToDomain","DelegateToWorkspace","Properties"
+"PublishToWeb","Publish to web","Export and sharing settings","True","True","Marketing","","","","",""
+"AllowServicePrincipalsUseReadAdminAPIs","Service principals can access read-only admin APIs","Admin API settings","False","","","","","","",""

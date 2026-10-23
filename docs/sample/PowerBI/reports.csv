@@ -1,0 +1,3 @@
+﻿"Workspace","WorkspaceId","Report","ReportId","ReportType","Format","ModelId","Model","ModelWorkspaceId","Description","IsOwnedByMe","IsFromPbix","AppId","Pages","WebUrl","ExportedTo"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales overview","r1","PowerBIReport","PBIX","d1","Sales model","aaaaaaaa-0000-0000-0000-000000000001","","","","","2","https://app.powerbi.com/r1",""
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Invoice: print/layout","r2","PaginatedReport","","","","","","","","","0","https://app.powerbi.com/r2",""

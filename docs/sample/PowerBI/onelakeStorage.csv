@@ -1,0 +1,4 @@
+﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","Tables","TableFiles","TableBytes","TableGB","FilesAreaFiles","FilesAreaBytes","FilesAreaGB","LastModified","Status"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Lakehouse","Bronze","lh1","2","4","1050676","0.001","1","2000","0","2026-09-02T10:00:00Z","Read"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Lakehouse","Gold","lh2","1","1","3000","0","0","0","0","2026-09-01T10:00:00Z","Read"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Warehouse","sales-dw","dw1","","","","","","","","","Not read: HTTP 403 AuthorizationPermissionMismatch: This request is not authorized"

@@ -1,0 +1,3 @@
+﻿"Pipeline","PipelineId","Stage","StageId","Order","Workspace","WorkspaceId","IsPublic","Items","Description"
+"Sales pipeline","dp1","Development","st0","0","","","False","",""
+"Sales pipeline","dp1","Production","st1","1","Sales","aaaaaaaa-0000-0000-0000-000000000001","True","2",""

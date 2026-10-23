@@ -1,0 +1,29 @@
+table Sales
+	lineageTag: 2
+
+	measure 'Total Sales' = SUM(Sales[Amount])
+		formatString: #,0
+		displayFolder: KPI
+
+	measure Margin =
+			VAR s = [Total Sales]
+			RETURN s * 0.2
+		formatString: 0.0%
+
+	column Amount
+		dataType: double
+		sourceColumn: Amount
+
+	column Double = Sales[Amount] * 2
+		dataType: double
+
+	partition Sales = m
+		mode: import
+		source =
+				let
+				    Source = Reference,
+				    t = Source{[Schema="dbo",Item="FactSales"]}[Data]
+				in
+				    t
+
+	annotation PBI_ResultType = Table

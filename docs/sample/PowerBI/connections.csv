@@ -1,0 +1,2 @@
+﻿"Connection","ConnectionId","ConnectivityType","ConnectionType","Path","GatewayId","PrivacyLevel","CredentialType","SingleSignOnType","ConnectionEncryption","SkipTestConnection"
+"sql1 Sales","c1","OnPremisesGateway","SQL","sql1.contoso.com;Sales","gw1","Organizational","Basic","None","Encrypted","False"

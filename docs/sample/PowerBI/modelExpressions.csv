@@ -1,0 +1,5 @@
+﻿"Workspace","WorkspaceId","Model","ModelId","Kind","Table","Name","FormatString","DisplayFolder","Expression"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Expression (M)","","Reference","","","let Source = Sql.Databases(""abc.datawarehouse.fabric.microsoft.com""), db = Source{[Name=""sales-dw""]}[Data] in db"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Measure","Sales","Total Sales","#,0","KPI","SUM(Sales[Amount])"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Measure","Sales","Margin","0.0%","","VAR s = [Total Sales] RETURN s * 0.2"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","CalculatedColumn","Sales","Double","","","Sales[Amount] * 2"

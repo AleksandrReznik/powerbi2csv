@@ -1,0 +1,4 @@
+﻿"Workspace","WorkspaceId","Principal","PrincipalId","PrincipalType","Role","UserPrincipalName","AppId","GroupType"
+"Finance DEV","aaaaaaaa-0000-0000-0000-000000000002","Anna Admin","u1","User","Admin","anna@contoso.com","",""
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Anna Admin","u1","User","Admin","anna@contoso.com","",""
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","deploy-sp","sp1","ServicePrincipal","Contributor","","app-123",""

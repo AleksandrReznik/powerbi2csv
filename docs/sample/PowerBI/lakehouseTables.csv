@@ -1,0 +1,6 @@
+﻿"Workspace","WorkspaceId","Lakehouse","LakehouseId","Schema","Table","Type","Format","Location","Source"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Bronze","lh1","","customers","Managed","delta","abfss://x/Tables/customers","Fabric API"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Bronze","lh1","","orders","Managed","delta","abfss://x/Tables/orders","Fabric API"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Gold","lh2","gold","fact_sales","","","","SQL endpoint"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Gold","lh2","gold","dim_date","","","","SQL endpoint"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Gold","lh2","silver","sales","","","","SQL endpoint"

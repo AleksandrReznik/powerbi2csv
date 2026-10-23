@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","Dataflow","DataflowId","Description","ConfiguredBy","ModifiedBy","ModifiedDateTime","Generation","Datasources","LastRunStatus","LastRunEnd","ExportedTo"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Customers","df1","","anna@contoso.com","","2026-09-01T00:00:00Z","1","1","Success","2026-09-28T01:05:00Z","PowerBI/Sales/dataflows/Customers.json"

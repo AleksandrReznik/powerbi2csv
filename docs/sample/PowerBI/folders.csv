@@ -1,0 +1,3 @@
+﻿"Workspace","WorkspaceId","Folder","FolderId","ParentFolderId","Path","Items"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","ETL","f1","","ETL","0"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Bronze","f2","f1","ETL/Bronze","1"

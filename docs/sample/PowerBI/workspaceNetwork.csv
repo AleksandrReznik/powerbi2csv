@@ -1,0 +1,2 @@
+﻿"Workspace","WorkspaceId","InboundDefaultAction","OutboundDefaultAction","Policy"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Allow","Deny","{""outbound"":{""publicAccessRules"":{""defaultAction"":""Deny""}},""inbound"":{""publicAccessRules"":{""defaultAction"":""Allow""}}}"
