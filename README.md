@@ -9,7 +9,7 @@ workspace member is enough, the Fabric administrator role adds the whole tenant.
 
 Built for tenant-to-tenant migrations, clean-ups and documentation, as the sibling of
 [azure2csv](https://github.com/AleksandrReznik/Azure2csv): same structure and helpers, so that the Power BI blocks
-can be merged into it. Background and examples: [blog post on it4it.solutions](https://it4it.solutions/?s=powerbi2csv).
+can be merged into it. Background and examples: [blog post on it4it.solutions](https://it4it.solutions/2026/10/23/powerbi2csv-power-bi-fabric-tenant-inventory/).
 
 ## Quick start
 
@@ -21,7 +21,6 @@ Connect-AzAccount                                  # the script reuses this sign
 .\powerbi2csv.ps1 -ListReports                     # the report catalog
 ```
 
-Or from the PowerShell Gallery: `Install-Script powerbi2csv -Scope CurrentUser`.
 
 Requirements: Windows PowerShell 5.1 or PowerShell 7, `Az.Accounts` 2.7.0 or newer. `ImportExcel` is optional (adds
 an .xlsx workbook). No app registration, no secrets, no admin role needed. Tested on Windows; the `FabricSql` report

@@ -127,7 +127,7 @@ Standard inventory plus a download of the .pbix files and item definitions of th
 https://github.com/AleksandrReznik/powerbi2csv
 
 .LINK
-https://it4it.solutions/?s=powerbi2csv
+https://it4it.solutions/2026/10/23/powerbi2csv-power-bi-fabric-tenant-inventory/
 
 .LINK
 https://learn.microsoft.com/rest/api/power-bi/
