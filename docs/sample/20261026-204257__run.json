@@ -1,17 +1,17 @@
 {
   "tool": "powerbi2csv",
   "version": "1.0.0",
-  "startedUtc": "2026-10-26T17:49:35Z",
-  "finishedUtc": "2026-10-26T17:49:36Z",
-  "durationSec": 0.5,
+  "startedUtc": "2026-10-26T18:42:57Z",
+  "finishedUtc": "2026-10-26T18:42:59Z",
+  "durationSec": 1.3,
   "host": {
-    "OutputBase": "C:\\inventory",
-    "OS": "Windows",
-    "CloudShell": false,
-    "AzAccounts": "9.9.9-test",
     "ClouddriveExists": false,
     "PSEdition": "Core",
-    "PSVersion": "7.6.8"
+    "OS": "Windows",
+    "PSVersion": "7.6.8",
+    "AzAccounts": "9.9.9-test",
+    "OutputBase": "C:\\inventory",
+    "CloudShell": false
   },
   "tenantId": "11111111-2222-3333-4444-555555555555",
   "account": "tester@contoso.com",
@@ -30,7 +30,8 @@
       "PowerAutomate",
       "PowerBIModels",
       "PowerBIAdmin",
-      "PowerBIActivity"
+      "PowerBIActivity",
+      "Principals"
     ],
     "datasets": [
       "PbiWorkspaces",
@@ -43,7 +44,8 @@
       "PowerAutomate",
       "PowerBIModels",
       "PowerBIAdmin",
-      "PowerBIActivity"
+      "PowerBIActivity",
+      "Principals"
     ],
     "workspaceFilter": [],
     "excludeWorkspace": [],
@@ -72,13 +74,13 @@
     {
       "Stage": "Dataset:PowerBI",
       "Status": "Partial",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": "2 workspace(s) partly readable with this account"
     },
     {
       "Stage": "Dataset:Fabric",
       "Status": "Collected",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": ""
     },
     {
@@ -90,7 +92,7 @@
     {
       "Stage": "Dataset:ItemDefinitions",
       "Status": "Collected",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": ""
     },
     {
@@ -120,7 +122,7 @@
     {
       "Stage": "Dataset:PowerBIAdmin",
       "Status": "Collected",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": ""
     },
     {
@@ -128,6 +130,12 @@
       "Status": "Collected",
       "DurationSec": 0.0,
       "Note": ""
+    },
+    {
+      "Stage": "Dataset:Principals",
+      "Status": "Collected",
+      "DurationSec": 0.0,
+      "Note": "6 principal(s), 6 looked up in Entra ID"
     },
     {
       "Stage": "Report:PowerBI",
@@ -180,7 +188,7 @@
     {
       "Stage": "Report:PowerBIAdmin",
       "Status": "Built",
-      "DurationSec": 0.1,
+      "DurationSec": 0.2,
       "Note": ""
     },
     {
@@ -188,17 +196,24 @@
       "Status": "Built",
       "DurationSec": 0.0,
       "Note": ""
+    },
+    {
+      "Stage": "Report:Principals",
+      "Status": "Built",
+      "DurationSec": 0.0,
+      "Note": ""
     }
   ],
   "apiCalls": {
+    "pbi": 61,
+    "SleepSec": 7.0,
+    "graph": 3,
+    "Throttled": 0,
     "fabric": 65,
     "sql": 3,
-    "flow": 4,
-    "SleepSec": 7.0,
-    "onelake": 6,
     "Retries": 0,
-    "Throttled": 0,
-    "pbi": 60
+    "onelake": 6,
+    "flow": 4
   },
   "files": [
     {
@@ -243,7 +258,7 @@
     },
     {
       "file": "PowerBI/adminWorkspaceUsers.csv",
-      "rows": 2
+      "rows": 4
     },
     {
       "file": "PowerBI/appContent.csv",
@@ -259,6 +274,10 @@
     },
     {
       "file": "PowerBI/capacities.csv",
+      "rows": 2
+    },
+    {
+      "file": "PowerBI/capacityFootprint.csv",
       "rows": 2
     },
     {
@@ -458,6 +477,10 @@
       "rows": 1
     },
     {
+      "file": "PowerBI/principals.csv",
+      "rows": 6
+    },
+    {
       "file": "PowerBI/refreshables.csv",
       "rows": 0
     },
@@ -468,6 +491,10 @@
     {
       "file": "PowerBI/refreshSchedules.csv",
       "rows": 1
+    },
+    {
+      "file": "PowerBI/repointingMap.csv",
+      "rows": 2
     },
     {
       "file": "PowerBI/reportDatasources.csv",
@@ -555,7 +582,7 @@
     },
     {
       "file": "PowerBI/workspaceScopeSummary.csv",
-      "rows": 16
+      "rows": 25
     },
     {
       "file": "PowerBI/workspaceSparkSettings.csv",
@@ -567,18 +594,18 @@
     },
     {
       "file": "findings.csv",
-      "rows": 12
+      "rows": 15
     },
     {
       "file": "coverage.csv",
-      "rows": 20
+      "rows": 21
     }
   ],
   "findings": {
     "High": 2,
-    "Medium": 4,
+    "Medium": 5,
     "Low": 2,
-    "Info": 4
+    "Info": 6
   },
   "coverage": [
     {
@@ -694,6 +721,12 @@
       "Status": "Collected",
       "Items": 3,
       "Detail": "2 day(s)."
+    },
+    {
+      "Area": "Principals",
+      "Status": "Collected",
+      "Items": 6,
+      "Detail": "6 principal(s), 6 looked up in Entra ID"
     },
     {
       "Area": "Report PowerBIExport",

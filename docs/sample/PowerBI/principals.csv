@@ -1,0 +1,7 @@
+﻿"Principal","Identifier","ObjectId","PrincipalType","AppId","Workspaces","Roles","Sources","EntraStatus","Departed"
+"Gina Guest","gina_fabrikam.com#EXT#@contoso.onmicrosoft.com","a0a0a0a0-0000-0000-0000-000000000002","Guest","","1","Workspace Viewer (1)","admin workspaces","Disabled","Yes"
+"deploy-sp","app-123","a0a0a0a0-0000-0000-0000-000000000003","Service principal","app-123","1","Workspace Contributor (1)","admin workspaces; Fabric role assignments","Active","No"
+"","ben@contoso.com","a0a0a0a0-0000-0000-0000-000000000004","User","","1","Workspace Admin (1)","admin workspaces","Not found (deleted)","Yes"
+"","gone@contoso.com","","User","","1","Item owner (configuredBy) (1)","admin items; semantic models and dataflows","Not found (deleted)","Yes"
+"Anna Admin","anna@contoso.com","a0a0a0a0-0000-0000-0000-000000000001","User","","2","Workspace Admin (2); Capacity admin (1); Item owner (configuredBy) (1); Semantic model access (1); Deployment pipeline (1)","admin workspaces; admin capacities; Fabric role assignments; workspace users; semantic models and dataflows; semantic model users; deployment pipelines","Active","No"
+"Vic Viewer","vic@contoso.com","a0a0a0a0-0000-0000-0000-000000000005","User","","1","Item access (1); Workspace Viewer (1)","admin item users; workspace users","Active","No"

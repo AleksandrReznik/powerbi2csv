@@ -1,2 +1,2 @@
 ﻿"Workspace","WorkspaceId","Model","ModelId","DatasourceType","Name","Server","Database","Url","Path","ConnectionString","GatewayId","GatewayName","DatasourceId","ConnectionDetails"
-"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Sql","","sql1.contoso.com","Sales","","","","gw1","","ds1","{""server"":""sql1.contoso.com"",""database"":""Sales""}"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Sql","","sql1.contoso.com","Sales","","","","gw1","","ds1","{""database"":""Sales"",""server"":""sql1.contoso.com""}"

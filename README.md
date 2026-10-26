@@ -48,12 +48,13 @@ A folder `powerbi2csv_<yyyyMMdd-HHmmss>_<tenant>` with:
 | `Fabric` | Quick, Standard | workspace member | `workspaces`, `fabricItems` (every item type, with folder path, tags, logical ID, last run), `folders`, `workspaceRoleAssignments`, `onelakeRoles` (OneLake security roles of lakehouses), `workspaceGit` (connection and number of uncommitted / incoming items), `gitItemStatus`, `workspaceNetwork` (inbound / outbound policy), `workspaceSparkSettings`, `sparkPools`, `sparkSessions` (latest 200 per workspace), `managedPrivateEndpoints`, `lakehouses`, `lakehouseTables`, `warehouses`, `shortcuts` (target connection, location, subpath), `itemSchedules`, `itemRuns` (run history of pipelines and notebooks), `itemConnections`, `connections`, `deploymentStages`, `deploymentStageItems`, `deploymentRoleAssignments` (deployment pipelines with every item type), `domains`, `environmentMatrix` (the same solution in DEV / TEST / UAT / PROD side by side), `capacities`, `gateways` |
 | `FabricSql` | Standard | read on the lakehouse / warehouse, outbound TCP 1433 | `sqlObjects` (tables, views, procedures, functions), `sqlColumns`, `sqlModules` (code of views and procedures), `sqlReferences` (references to other databases). Also fills the counts in `warehouses` and `lakehouses` and the tables of lakehouses with schemas in `lakehouseTables` |
 | `Dependencies` | Standard | Contributor (item definitions) | `pipelineActivities` (what each pipeline runs: notebooks, dataflows, procedures with parameters, model refreshes), `notebookDependencies` (attached lakehouses, tables read and written, OneLake paths, notebooks called, URLs), `dataflowSources` (SharePoint site and file, SQL, destination lakehouse), `modelPartitions` (import / Direct Lake / DirectQuery per table), `modelExpressions` (DAX of measures and calculated columns, M queries), `modelRoles` (row-level security), `modelSources`, `itemDependencies` (every item-to-item link in one file), `externalDependencies` (every SharePoint site, SQL server, storage account, URL and who uses it) |
-| `PowerBIAdmin` | Standard | Fabric administrator | `adminWorkspaces` (whole tenant, also personal and orphaned; per workspace the scope - personal or shared, with content or empty, not active -, item count, last change seen, changed in the last 30 days, admins and a NoAdmin flag, data source types and gateway use), `workspaceScopeSummary` (the tenant's migration scope on one page), `adminWorkspaceUsers`, `adminItems`, `adminItemUsers`, `adminDatasourceInstances`, `adminModelTables`, `adminModelExpressions`, `tenantSettings`, `adminCapacities`, `adminApps`, `widelyShared`, `adminDomains`, `scan\scanResult_*.json` (complete Scanner API answer) |
+| `PowerBIAdmin` | Standard | Fabric administrator | `adminWorkspaces` (whole tenant, also personal and orphaned; per workspace the scope - personal or shared, with content or empty, not active -, item count, last change seen, changed in the last 30 days, active users, admins, departed admins and a NoAdmin flag, data source types and gateway use), `workspaceScopeSummary` (the tenant's migration scope on one page), `repointingMap` (per workspace, also those the account cannot open: every data source host, gateway, the items and models using it and their refresh schedules), `capacityFootprint` (estimate per capacity: workspaces, items, refreshes, active users), `adminWorkspaceUsers`, `adminItems`, `adminItemUsers`, `adminDatasourceInstances`, `adminModelTables`, `adminModelExpressions`, `tenantSettings`, `adminCapacities`, `adminApps`, `widelyShared`, `adminDomains`, `scan\scanResult_*.json` (complete Scanner API answer) |
 | `FabricCode` * | Full, Migration | Contributor (item definitions) | the code as files: `<workspace>\Notebook\<notebook>\notebook-content.py`, `<workspace>\DataPipeline\<pipeline>\pipeline-content.json`, `<workspace>\Dataflow\<dataflow>\mashup.pq`, `<workspace>\SemanticModel\<model>\definition\*.tmdl`, every other item type that has a definition, `<workspace>\dataflows\*.json` (gen1), `<workspace>\sql\<database>\*.sql` (with `FabricSql`), and `exportIndex`. No report files, no data |
 | `FabricStorage` * | Full, Migration | read on the lakehouse / warehouse | `onelakeStorage` (size per lakehouse and warehouse), `onelakeTableSizes` (files and bytes per table) |
 | `PowerAutomate` * | Full, Migration | flow owner; Power Platform administrator for all flows | `flowEnvironments`, `flows` (triggers, connectors, whether a flow uses Power BI) |
 | `PowerBIModels` * | Full, Migration | Build permission on the model | `modelTables`, `modelColumns`, `modelMeasures`, `modelRelationships` |
-| `PowerBIActivity` * | Full, Security | Fabric administrator | `activityEvents` (last `-PbiActivityDays` days, at most 28) |
+| `PowerBIActivity` * | Full, Security | Fabric administrator | `activityEvents` (last `-PbiActivityDays` days, at most 28); also feeds the active-user counts in `adminWorkspaces` and `capacityFootprint` |
+| `Principals` | Standard | any; the Entra ID lookup uses the directory read that members have by default | `principals` (every user, guest, group, service principal and managed identity with a role on a workspace, item, capacity, gateway or deployment pipeline, or owning a model or dataflow: type, app ID, roles, workspace count, and whether the account still exists, is disabled or was deleted) |
 | `PowerBIExport` ** | only when named | Contributor | everything of `FabricCode`, plus the report definitions (PBIR) and the report files, which contain data: `exportIndex`, `<workspace>\reports\*.pbix`, `<workspace>\<item type>\<item>\*` (TMDL, PBIR, notebooks, pipelines, ...), `<workspace>\dataflows\*.json`, `<workspace>\sql\<database>\*.sql` |
 
 \* opt-in: in `-ReportProfile Full` or when named. \*\* only when named in `-Reports` / `-AddReports`.
@@ -82,13 +83,19 @@ For the case where a Fabric administrator of another organisation runs the scrip
 admin APIs are called, and only what a migration scope needs is collected:
 
 - **Written:** `adminWorkspaces.csv` (type, scope, state, capacity, number of users, workspace admins, item count, last
-  change seen, data source types, gateway yes/no), `adminCapacities.csv`, `adminDatasourceInstances.csv` (type and
-  gateway only, no server, database, URL or path), `workspaceScopeSummary.csv`, `workspacePlan.csv` (with
-  `-WorkspaceListFile`), `findings.csv`, `coverage.csv`, the log and a zip.
-- **Not collected at all:** item names in files, users other than workspace admins, data source addresses, model
-  schemas, DAX and M, code, tenant settings, sharing links, the activity log. The Scanner API is asked without
-  `datasetSchema`, `datasetExpressions` and `getArtifactUsers`, so those never leave the service, and no raw Scanner
-  answer is written.
+  change seen, active users, data source types, gateway yes/no), `adminCapacities.csv`, `adminDatasourceInstances.csv`
+  (type and gateway only), `repointingMap.csv` (type and **host name** per workspace and data source, gateway, number
+  of items and models, refresh schedules; no database, path, file or item names), `capacityFootprint.csv`,
+  `principals.csv` (groups, service principals, managed identities and workspace or capacity admins by name; all other
+  people only as counts in the summary), `workspaceScopeSummary.csv`, `workspacePlan.csv` (with `-WorkspaceListFile`),
+  `findings.csv`, `coverage.csv`, the log and a zip.
+- **Counted, not written:** the activity log of the last `-PbiActivityDays` days (7 by default), for active users per
+  workspace and capacity.
+- **Looked up:** whether the accounts of the principals still exist in Entra ID (deleted or disabled).
+- **Not collected at all:** item names in files, data source databases and paths, model schemas, DAX and M, code,
+  per-item users, tenant settings, sharing links. The Scanner API is asked without `datasetSchema`,
+  `datasetExpressions` and `getArtifactUsers`, so those never leave the service, and no raw Scanner answer is
+  written.
 - `-Reports`, `-AddReports`, `-SkipReports` and `-ReportProfile` are ignored; `-Zip` is on. The run prints what it
   collects before it starts. Without the administrator role it stops with a warning and writes only the log and
   coverage.
@@ -96,7 +103,9 @@ admin APIs are called, and only what a migration scope needs is collected:
 `workspaceScopeSummary.csv` answers "how many of the tenant's 2,000 workspaces really need a migration" in one
 glance: workspaces in the tenant, not active, personal (with content, empty), shared (empty, with content), and of
 the shared ones with content how many are on a capacity, use a gateway, have no admin, changed in the last 30 days,
-and (with a workspace list) how many are not on it.
+how many data source hosts they reference, how many users, guests, groups, apps and departed accounts have access,
+how many users were active, and (with a workspace list) how many are not on it. Finding `PBI-19` explains the number
+of personal workspaces in one sentence: Power BI creates one for every user who opens it, and most stay empty.
 
 ### Checking against a list of expected workspaces
 
@@ -150,8 +159,17 @@ Known gaps:
   workspace's items as the Scanner API reports them, `ChangedLast30Days` comes from the Scanner API's modified list
   (it looks back 30 days at most), `RecentActivities` from the activity log when `PowerBIActivity` runs.
   `CreatedDate` / `ModifiedDate` are filled only if the API returns them.
-- `NoAdmin` means no user, group or app with the Admin role (or the state Orphaned). Whether an admin's account has
-  been disabled in Entra ID is not checked.
+- `NoAdmin` means no active admin: nobody with the Admin role, every admin's account deleted or disabled in Entra ID
+  (with the `Principals` report), or the state Orphaned. Group members are not expanded: a group admin counts as
+  active as long as the group exists.
+- `Principals` looks accounts up in Entra ID through Microsoft Graph with the Az sign-in: by object ID where the APIs
+  give one (groups, apps, Fabric role assignments), otherwise by UPN; an unknown UPN counts as deleted. Disabled
+  accounts are found when the account may read the `accountEnabled` flag (members usually can). An app registration
+  and a managed identity are told apart by the service principal type.
+- `repointingMap` has refresh schedules for models on a dedicated capacity only: the admin API for schedules covers
+  capacities, and there is no tenant-wide schedule API for shared capacity (`ScheduleKnown` says which).
+- `capacityFootprint` is an estimate from counts, refresh statistics and the activity log. Capacity consumption (CU)
+  has no API.
 - The admin parts were built and tested against a fake tenant only: the account this was developed with is not a
   Fabric administrator. Run them on a few workspaces first and check `coverage.csv`.
 - Not read: capacity usage (the Capacity Metrics data has no REST API), tenant-wide tags and sensitivity labels

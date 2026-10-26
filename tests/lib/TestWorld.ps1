@@ -98,12 +98,17 @@ function New-TWWorld {
     # admin (only reached when $global:TW.Admin)
     $pbi.Add((New-TWRoute GET '^/admin/capacities$' { New-TWList @(@{ id = $global:TWCap; displayName = 'cap-prod'; sku = 'F64'; region = 'West Europe'; state = 'Active'; admins = @('anna@contoso.com') }) }))
     $pbi.Add((New-TWRoute GET '^/admin/groups\?' { New-TWList @(
-                    @{ id = $global:TWW1; name = 'Sales'; description = 'Sales team workspace'; type = 'Workspace'; state = 'Active'; isOnDedicatedCapacity = $true; capacityId = $global:TWCap; users = @(@{ identifier = 'anna@contoso.com'; emailAddress = 'anna@contoso.com'; groupUserAccessRight = 'Admin'; principalType = 'User' }) },
+                    @{ id = $global:TWW1; name = 'Sales'; description = 'Sales team workspace'; type = 'Workspace'; state = 'Active'; isOnDedicatedCapacity = $true; capacityId = $global:TWCap; users = @(
+                        @{ identifier = 'anna@contoso.com'; emailAddress = 'anna@contoso.com'; groupUserAccessRight = 'Admin'; principalType = 'User'; userType = 'Member'; graphId = 'a0a0a0a0-0000-0000-0000-000000000001' },
+                        @{ identifier = 'gina_fabrikam.com#EXT#@contoso.onmicrosoft.com'; emailAddress = 'gina@fabrikam.com'; displayName = 'Gina Guest'; groupUserAccessRight = 'Viewer'; principalType = 'User'; userType = 'Guest'; graphId = 'a0a0a0a0-0000-0000-0000-000000000002' },
+                        @{ identifier = 'app-123'; displayName = 'deploy-sp'; groupUserAccessRight = 'Contributor'; principalType = 'App'; graphId = 'a0a0a0a0-0000-0000-0000-000000000003' }) },
                     @{ id = 'aaaaaaaa-0000-0000-0000-000000000009'; name = 'Orphaned'; type = 'Workspace'; state = 'Active'; isOnDedicatedCapacity = $false; users = @() },
                     @{ id = 'aaaaaaaa-0000-0000-0000-00000000000a'; name = 'PersonalWorkspace Bob'; type = 'PersonalGroup'; state = 'Active'; users = @() },
                     @{ id = 'aaaaaaaa-0000-0000-0000-00000000000b'; name = 'Legacy reports'; type = 'Workspace'; state = 'Active'; isOnDedicatedCapacity = $false
-                        users = @(@{ identifier = 'ben@contoso.com'; emailAddress = 'ben@contoso.com'; groupUserAccessRight = 'Viewer'; principalType = 'User' }) },
+                        users = @(@{ identifier = 'ben@contoso.com'; emailAddress = 'ben@contoso.com'; groupUserAccessRight = 'Admin'; principalType = 'User'; graphId = 'a0a0a0a0-0000-0000-0000-000000000004' }) },
                     @{ id = 'aaaaaaaa-0000-0000-0000-00000000000c'; name = 'Old project'; type = 'Workspace'; state = 'Deleted'; users = @() }) }))
+    $pbi.Add((New-TWRoute GET '^/admin/capacities/refreshables\?' { New-TWList @(@{ id = 'd1'; name = 'Sales model'; kind = 'Dataset'; refreshCount = 7; refreshesPerDay = 1; averageDuration = 120
+                        refreshSchedule = @{ days = @('Monday'); times = @('05:00'); enabled = $true }; capacity = @{ id = $global:TWCap; displayName = 'cap-prod' }; group = @{ id = $global:TWW1; name = 'Sales' } }) }))
     $pbi.Add((New-TWRoute GET '^/admin/workspaces/modified\?modifiedSince=' { , @(@{ id = $global:TWW1 }) }))
     $pbi.Add((New-TWRoute GET '^/admin/workspaces/modified\?' { , @(@{ id = $global:TWW1 }, @{ id = 'aaaaaaaa-0000-0000-0000-000000000009' }, @{ id = 'aaaaaaaa-0000-0000-0000-00000000000a' },
                     @{ id = 'aaaaaaaa-0000-0000-0000-00000000000b' }) }))
@@ -310,7 +315,28 @@ in Navigation_2;
                             creator = @{ userId = 'u1' }; definitionSummary = @{ triggers = @(@{ type = 'Recurrence' }); actions = @(@{ type = 'OpenApiConnection'; api = @{ name = 'shared_powerbi' } }) }
                             connectionReferences = @{ shared_powerbi = @{ displayName = 'Power BI' } } } }) }))
 
+    # ---- Microsoft Graph (Entra ID lookup of principals) ----
+    $graph = [System.Collections.Generic.List[object]]::new()
+    $graph.Add((New-TWRoute POST '^/v1\.0/directoryObjects/getByIds$' { New-TWList @(
+                    @{ '@odata.type' = '#microsoft.graph.user'; id = 'a0a0a0a0-0000-0000-0000-000000000001'; displayName = 'Anna Admin'; userType = 'Member' },
+                    @{ '@odata.type' = '#microsoft.graph.user'; id = 'a0a0a0a0-0000-0000-0000-000000000002'; displayName = 'Gina Guest'; userType = 'Guest' },
+                    @{ '@odata.type' = '#microsoft.graph.servicePrincipal'; id = 'a0a0a0a0-0000-0000-0000-000000000003'; displayName = 'deploy-sp'; appId = 'app-123'; servicePrincipalType = 'Application' },
+                    @{ '@odata.type' = '#microsoft.graph.user'; id = 'a0a0a0a0-0000-0000-0000-000000000005'; displayName = 'Vic Viewer'; userType = 'Member' }) }))
+    $graph.Add((New-TWRoute POST '^/v1\.0/\$batch$' {
+                param($Path, $Body)
+                # /users/{upn}: Vic and Anna exist (enabled), everyone else is unknown
+                $b = ConvertFrom-Json $Body
+                $out = foreach ($q in @($b.requests)) {
+                    $u = [uri]::UnescapeDataString([string]$q.url)
+                    if ($u -match '^/users/vic@contoso\.com\?') { @{ id = $q.id; status = 200; body = @{ id = 'a0a0a0a0-0000-0000-0000-000000000005'; displayName = 'Vic Viewer'; userType = 'Member'; accountEnabled = $true } } }
+                    elseif ($u -match '^/users/anna@contoso\.com\?') { @{ id = $q.id; status = 200; body = @{ id = 'a0a0a0a0-0000-0000-0000-000000000001'; displayName = 'Anna Admin'; userType = 'Member'; accountEnabled = $true } } }
+                    else { @{ id = $q.id; status = 404; body = @{ error = @{ code = 'Request_ResourceNotFound' } } } }
+                }
+                @{ responses = @($out) } }))
+    $graph.Add((New-TWRoute GET '^/v1\.0/users\?\$filter=accountEnabled' { New-TWList @(@{ id = 'a0a0a0a0-0000-0000-0000-000000000002' }) }))
+
     return @{
+        GraphRoutes  = $graph
         OneLakeRoutes = $one
         FlowRoutes   = $flow
         Context      = [pscustomobject]@{ Account = [pscustomobject]@{ Id = 'tester@contoso.com' }; Tenant = [pscustomobject]@{ Id = '11111111-2222-3333-4444-555555555555' } }

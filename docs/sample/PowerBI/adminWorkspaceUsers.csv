@@ -1,3 +1,5 @@
 ﻿"Workspace","WorkspaceId","DisplayName","Identifier","EmailAddress","PrincipalType","AccessRight","UserType","GraphId"
-"Sales","aaaaaaaa-0000-0000-0000-000000000001","","anna@contoso.com","anna@contoso.com","User","Admin","",""
-"Legacy reports","aaaaaaaa-0000-0000-0000-00000000000b","","ben@contoso.com","ben@contoso.com","User","Viewer","",""
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","","anna@contoso.com","anna@contoso.com","User","Admin","Member","a0a0a0a0-0000-0000-0000-000000000001"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Gina Guest","gina_fabrikam.com#EXT#@contoso.onmicrosoft.com","gina@fabrikam.com","User","Viewer","Guest","a0a0a0a0-0000-0000-0000-000000000002"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","deploy-sp","app-123","","App","Contributor","","a0a0a0a0-0000-0000-0000-000000000003"
+"Legacy reports","aaaaaaaa-0000-0000-0000-00000000000b","","ben@contoso.com","ben@contoso.com","User","Admin","","a0a0a0a0-0000-0000-0000-000000000004"

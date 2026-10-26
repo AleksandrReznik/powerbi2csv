@@ -60,6 +60,7 @@ function Invoke-A2CHttp {
         }
     }
     if ($Kind -eq 'onelake') { return (Resolve-TWRoute -Routes $global:TW.OneLakeRoutes -Method $Method -Path ($Uri -replace '^https://onelake\.dfs\.fabric\.microsoft\.com', '') -Body $Body -Kind 'onelake') }
+    if ($Kind -eq 'graph') { return (Resolve-TWRoute -Routes $global:TW.GraphRoutes -Method $Method -Path ($Uri -replace '^https://graph\.microsoft\.com', '') -Body $Body -Kind 'graph') }
     if ($Kind -eq 'flow') { return (Resolve-TWRoute -Routes $global:TW.FlowRoutes -Method $Method -Path ($Uri -replace '^https://api\.flow\.microsoft\.com', '') -Body $Body -Kind 'flow') }
     return @{ StatusCode = 0; Content = 'Unknown API kind: ' + $Kind; Headers = @{} }
 }

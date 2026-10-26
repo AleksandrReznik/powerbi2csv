@@ -62,7 +62,7 @@ Test-Case 'comma list from pwsh -File is put together again' {
 }
 Test-Case 'profiles: Standard has no opt-in reports, Full has all but the export' {
     $std = Resolve-A2CSelection (New-A2COptions -Params @{})
-    Assert-Equal 'PowerBI Fabric FabricSql Dependencies PowerBIAdmin' ($std -join ' ')
+    Assert-Equal 'PowerBI Fabric FabricSql Dependencies PowerBIAdmin Principals' ($std -join ' ')
     $full = Resolve-A2CSelection (New-A2COptions -Params @{ ReportProfile = 'Full' })
     Assert-True ($full -contains 'PowerBIModels'); Assert-True ($full -contains 'PowerBIActivity'); Assert-False ($full -contains 'PowerBIExport')
 }
@@ -417,7 +417,7 @@ Test-Case 'admin: all workspaces of the tenant with users' {
     Assert-Equal 5 $w.Count
     Assert-Equal '0' ($w | Where-Object { $_.Workspace -eq 'Orphaned' }).Users
     Assert-Equal '3' ($w | Where-Object { $_.Workspace -eq 'Sales' }).Items
-    Assert-Equal 2 @(Import-TWCsv $run 'PowerBI/adminWorkspaceUsers.csv').Count
+    Assert-Equal 4 @(Import-TWCsv $run 'PowerBI/adminWorkspaceUsers.csv').Count
 }
 Test-Case 'admin: Scanner API result (items of every type, access, data sources, expressions, raw JSON)' {
     $i = Import-TWCsv $run 'PowerBI/adminItems.csv'
@@ -503,6 +503,54 @@ Test-Case 'workspaceScopeSummary.csv and findings PBI-17 / PBI-18' {
     Assert-Equal '2' $p18.Count; Assert-Equal '5 workspaces: 1 personal (1 empty), 3 shared (1 empty), 1 not active' $p18.Detail
 }
 
+Test-Case 'principals: merged across APIs, typed, looked up in Entra ID (deleted, disabled, service principal)' {
+    $p = Import-TWCsv $run 'PowerBI/principals.csv'
+    $row = { param($id) $p | Where-Object { $_.Identifier -eq $id } }
+    $a = & $row 'anna@contoso.com'
+    Assert-Equal 'User Active No 2' ('{0} {1} {2} {3}' -f $a.PrincipalType, $a.EntraStatus, $a.Departed, $a.Workspaces)
+    Assert-Match $a.Roles 'Workspace Admin \(2\)'; Assert-Match $a.Roles 'Capacity admin \(1\)'
+    $g = & $row 'gina_fabrikam.com#EXT#@contoso.onmicrosoft.com'
+    Assert-Equal 'Guest Disabled Yes' ('{0} {1} {2}' -f $g.PrincipalType, $g.EntraStatus, $g.Departed)
+    $s = & $row 'app-123'
+    Assert-Equal 'Service principal app-123 Active' ('{0} {1} {2}' -f $s.PrincipalType, $s.AppId, $s.EntraStatus)
+    Assert-Match $s.Roles 'Workspace Contributor'
+    $b = & $row 'ben@contoso.com'
+    Assert-Equal 'Not found (deleted) Yes' ($b.EntraStatus + ' ' + $b.Departed)
+    Assert-Equal 'Active a0a0a0a0-0000-0000-0000-000000000005' ((& $row 'vic@contoso.com').EntraStatus + ' ' + (& $row 'vic@contoso.com').ObjectId) 'found by UPN'
+    Assert-Equal 'Not found (deleted) Yes Item owner (configuredBy) (1)' ((& $row 'gone@contoso.com').EntraStatus + ' ' + (& $row 'gone@contoso.com').Departed + ' ' + (& $row 'gone@contoso.com').Roles) 'unknown UPN = deleted'
+    Assert-Equal 1 @($p | Where-Object { $_.Identifier -eq 'anna@contoso.com' }).Count 'one row per principal'
+    $l = Import-TWCsv $run 'PowerBI/adminWorkspaces.csv' | Where-Object { $_.Workspace -eq 'Legacy reports' }
+    Assert-Equal 'ben@contoso.com 1 True' ('{0} {1} {2}' -f $l.Admins, $l.AdminsDeparted, $l.NoAdmin)
+    Assert-Match ((Import-TWCsv $run 'findings.csv') | Where-Object { $_.Id -eq 'PBI-20' }).Detail 'ben@contoso.com'
+}
+Test-Case 're-pointing map: hosts, gateway, items and refresh schedules per workspace, also for workspaces this account cannot open' {
+    $m = Import-TWCsv $run 'PowerBI/repointingMap.csv'
+    $s = $m | Where-Object { $_.Workspace -eq 'Sales' }
+    Assert-Equal 'SQL sql1.contoso.com sql1.contoso.com Sales True 1 Sales model 1 1 Monday 05:00 Yes' ('{0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10}' -f $s.Kind, $s.Host, $s.Target, $s.Database, $s.UsesGateway, $s.Items,
+        $s.ItemNames, $s.Models, $s.ScheduledModels, $s.RefreshSchedules, $s.ScheduleKnown)
+    $l = $m | Where-Object { $_.Workspace -eq 'Legacy reports' }
+    Assert-Equal 'SharePoint contoso.sharepoint.com https://contoso.sharepoint.com/sites/Old False 1 Old model' ('{0} {1} {2} {3} {4} {5}' -f $l.Kind, $l.Host, $l.Target, $l.UsesGateway, $l.Items, $l.ItemNames)
+    Assert-Match $l.ScheduleKnown '^No: shared capacity'; Assert-Equal '' $l.ScheduledModels
+    $f = (Import-TWCsv $run 'findings.csv') | Where-Object { $_.Id -eq 'PBI-21' }
+    Assert-Equal '2 SharePoint (1), SQL (1)' ($f.Count + ' ' + $f.Detail)
+}
+Test-Case 'usage estimate: active users per workspace and capacity, capacity footprint, principal counts' {
+    $c = Import-TWCsv $run 'PowerBI/capacityFootprint.csv'
+    $p = $c | Where-Object { $_.Capacity -eq 'cap-prod' }
+    Assert-Equal '1 1 3 1 1 120 1' ('{0} {1} {2} {3} {4} {5} {6}' -f $p.Workspaces, $p.SharedWithContent, $p.Items, $p.ScheduledModels, $p.RefreshesPerDay, $p.AvgRefreshSec, $p.ActiveUsers)
+    $sh = $c | Where-Object { $_.Capacity -eq '(shared capacity)' }
+    Assert-Equal '3 1 2 ' ('{0} {1} {2} {3}' -f $sh.Workspaces, $sh.SharedWithContent, $sh.Items, $sh.ScheduledModels)
+    Assert-Match $p.Note '^estimate'
+    Assert-Equal '1' (Import-TWCsv $run 'PowerBI/adminWorkspaces.csv' | Where-Object { $_.Workspace -eq 'Sales' }).ActiveUsers
+    $sum = @{}; foreach ($r in (Import-TWCsv $run 'PowerBI/workspaceScopeSummary.csv')) { $sum[$r.Measure] = $r.Count }
+    $want = [ordered]@{ 'Data source hosts used by shared workspaces with content' = '2'; 'Data sources through a gateway (shared workspaces with content)' = '1'
+        'Principals: users' = '4'; 'Principals: guests' = '1'; 'Principals: groups' = '0'; 'Principals: service principals and apps' = '1'; 'Principals: managed identities' = '0'
+        'Principals: people whose account was deleted or disabled' = '3'; 'Active users in the activity log' = '1' }
+    foreach ($k in $want.Keys) { Assert-Equal $want[$k] $sum[$k] $k }
+    $f = (Import-TWCsv $run 'findings.csv') | Where-Object { $_.Id -eq 'PBI-19' }
+    Assert-Equal '1 personal workspaces, 1 of them empty (100%), 0 with content; 4 users and 1 guests have a role somewhere' $f.Detail
+}
+
 Write-Host 'Share-safe scope run (-ClientScope)' -ForegroundColor Cyan
 Test-Case '-ClientScope: admin APIs only, the share-safe files only, nothing sensitive in the output' {
     $csv = Join-Path $global:TWOut 'scope.csv'
@@ -512,20 +560,29 @@ Test-Case '-ClientScope: admin APIs only, the share-safe files only, nothing sen
     $r = Invoke-TWRun -Params @{ ClientScope = $true; WorkspaceListFile = $csv; Reports = 'PowerBI,FabricCode' } -KeepWorld
     Assert-Equal '' ($global:TWUnrouted -join ' | ')
     Assert-Equal 0 $r.Errors.Count ($r.Errors -join ' | ')
-    Assert-Equal 'PowerBIAdmin' ($r.Selected -join ',') 'other reports are ignored'
+    Assert-Equal 'PowerBIAdmin,PowerBIActivity,Principals' ($r.Selected -join ',') 'other reports are ignored'
     $files = (Get-ChildItem -LiteralPath (Join-Path $r.OutDir 'PowerBI') -Recurse -File | ForEach-Object { $_.Name } | Sort-Object) -join ', '
-    Assert-Equal 'adminCapacities.csv, adminDatasourceInstances.csv, adminWorkspaces.csv, workspacePlan.csv, workspaceScopeSummary.csv' $files
+    Assert-Equal ('adminCapacities.csv, adminDatasourceInstances.csv, adminWorkspaces.csv, capacityFootprint.csv, principals.csv, repointingMap.csv, workspacePlan.csv, ' +
+        'workspaceScopeSummary.csv') $files
     Assert-True (Test-Path -LiteralPath (Join-Path $global:TWOut ($r.RunName + '.zip'))) 'zip is on'
     $reqs = @($global:TWRequests | ForEach-Object { $_.Uri })
-    Assert-Equal 0 @($reqs | Where-Object { $_ -match 'tenantsettings|/admin/apps|widelyShared|/admin/domains|/admin/activityevents' }).Count 'no settings, apps, sharing links or activity'
-    Assert-Equal 0 @($reqs | Where-Object { $_ -notmatch '/admin/' }).Count 'only admin APIs'
+    Assert-Equal 0 @($reqs | Where-Object { $_ -match 'tenantsettings|/admin/apps|widelyShared|/admin/domains' }).Count 'no settings, apps or sharing links'
+    Assert-Equal 0 @($reqs | Where-Object { $_ -notmatch '/admin/|graph\.microsoft\.com/v1\.0/(directoryObjects/getByIds|users\?)' }).Count 'only admin APIs and the Entra ID lookup'
     $scan = @($global:TWRequests | Where-Object { $_.Uri -match 'getInfo' })[0].Uri
     Assert-Match $scan 'lineage=True&datasourceDetails=True$'
     $text = (Get-ChildItem -LiteralPath $r.OutDir -Recurse -File | Where-Object { $_.Extension -in '.csv', '.json', '.txt' } | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join "`n"
-    foreach ($secret in @('sql1.contoso.com', 'contoso.sharepoint.com', 'Sales team workspace', 'ben@contoso.com', 'vic@contoso.com', 'Sales overview', 'SUM(Sales[Amount])')) {
+    foreach ($secret in @('/sites/Old', 'Sales team workspace', 'vic@contoso.com', 'gina', 'Sales overview', 'Sales model', 'Old KPI', 'Old model', 'SUM(Sales[Amount])')) {
         Assert-False ($text.Contains($secret)) ('found in the output: ' + $secret)
     }
-    Assert-True ($text.Contains('anna@contoso.com')) 'workspace admins are kept'
+    foreach ($kept in @('anna@contoso.com', 'ben@contoso.com', 'deploy-sp', 'sql1.contoso.com', 'contoso.sharepoint.com')) {
+        Assert-True ($text.Contains($kept)) ('workspace admins, apps and host names are kept: ' + $kept)
+    }
+    Assert-False (Test-Path -LiteralPath (Join-Path $r.OutDir 'PowerBI\activityEvents.csv')) 'the activity log is counted, not written'
+    $map = Import-TWCsv $r 'PowerBI/repointingMap.csv'
+    Assert-Equal 2 $map.Count
+    Assert-Equal 0 @($map | Where-Object { $_.Target -or $_.Database -or $_.ItemNames }).Count 'host names only'
+    $sum0 = @{}; foreach ($x in (Import-TWCsv $r 'PowerBI/workspaceScopeSummary.csv')) { $sum0[$x.Measure] = $x.Count }
+    Assert-Equal '1 1' ($sum0['Principals: guests'] + ' ' + $sum0['Active users in the activity log']) 'people as counts'
     Assert-Match ([IO.File]::ReadAllText($r.LogPath)) '-ClientScope: only the scope of the tenant is collected'
     $plan = Import-TWCsv $r 'PowerBI/workspacePlan.csv'
     $got = ($plan | ForEach-Object { '{0}|{1}|{2}|{3}' -f $_.ListedWorkspace, $_.Status, $_.Check, $_.Workspace }) -join ' / '
@@ -536,7 +593,7 @@ Test-Case '-ClientScope: admin APIs only, the share-safe files only, nothing sen
     Assert-Equal '4 1 2 1 not available from the admin APIs' ('{0} {1} {2} {3} {4}' -f $sum['On the workspace list'], $sum['On the list, not found in the tenant'], $sum['On the list, but empty, personal or not active'],
         $sum['Shared with content, not on the list'], ((Import-TWCsv $r 'PowerBI/workspaceScopeSummary.csv') | Where-Object { $_.Measure -eq 'Shared with content, connected to Git' }).Note)
     $ids = ((Import-TWCsv $r 'findings.csv') | ForEach-Object { $_.Id } | Sort-Object) -join ' '
-    Assert-Equal 'PBI-11 PBI-15 PBI-16 PBI-17 PBI-18' $ids
+    Assert-Equal 'PBI-11 PBI-15 PBI-16 PBI-17 PBI-18 PBI-19 PBI-20 PBI-21' $ids
 }
 Test-Case '-ClientScope without the administrator role: a clear skip, no error, no scope files' {
     $r = Invoke-TWRun -Params @{ ClientScope = $true }

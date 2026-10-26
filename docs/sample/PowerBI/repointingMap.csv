@@ -1,0 +1,3 @@
+﻿"Workspace","WorkspaceId","Scope","DatasourceType","Kind","Host","Target","Database","GatewayId","UsesGateway","Items","ItemNames","Models","ScheduledModels","RefreshSchedules","ScheduleKnown"
+"Legacy reports","aaaaaaaa-0000-0000-0000-00000000000b","Shared, with content","SharePointList","SharePoint","contoso.sharepoint.com","https://contoso.sharepoint.com/sites/Old","","","False","1","Old model","1","","","No: shared capacity (no tenant-wide schedule API)"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Shared, with content","Sql","SQL","sql1.contoso.com","sql1.contoso.com","Sales","gw1","True","1","Sales model","1","1","Monday 05:00","Yes"

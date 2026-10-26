@@ -1,2 +1,2 @@
 ﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","JobType","ScheduleId","Enabled","CreatedDateTime","Owner","Configuration"
-"Sales","aaaaaaaa-0000-0000-0000-000000000001","Notebook","Load bronze","nb1","RunNotebook","sch1","True","2026-01-01T00:00:00Z","Anna Admin","{""times"":[""02:00""],""type"":""Daily""}"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Notebook","Load bronze","nb1","RunNotebook","sch1","True","2026-01-01T00:00:00Z","Anna Admin","{""type"":""Daily"",""times"":[""02:00""]}"

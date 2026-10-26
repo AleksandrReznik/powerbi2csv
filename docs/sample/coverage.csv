@@ -18,4 +18,5 @@
 "Semantic model schema (DAX INFO.VIEW)","Partial","1","1 model(s) not readable: Sales / Unused model: HTTP 400 DatasetExecuteQueriesError: Query execution is disabled"
 "Power BI admin (tenant-wide)","Collected","5",""
 "Power BI activity log","Collected","3","2 day(s)."
+"Principals","Collected","6","6 principal(s), 6 looked up in Entra ID"
 "Report PowerBIExport","NotSelected","","PowerBI\exportIndex.csv, PowerBI\<workspace>\reports\*.pbix, PowerBI\<workspace>\<item type>\<item>\* (definitions), PowerBI\<workspace>\dataflows\*.json, PowerBI\<workspace>\sql\<database>\*.sql"

@@ -1,2 +1,2 @@
 ﻿"Gateway","GatewayId","Type","Status","Version","Members","Datasources","Annotation","Source","Properties"
-"onprem-gw","gw1","OnPremises","","3000.1","2","","","Fabric","{""displayName"":""onprem-gw"",""numberOfMemberGateways"":2,""version"":""3000.1"",""id"":""gw1"",""type"":""OnPremises""}"
+"onprem-gw","gw1","OnPremises","","3000.1","2","","","Fabric","{""displayName"":""onprem-gw"",""version"":""3000.1"",""numberOfMemberGateways"":2,""type"":""OnPremises"",""id"":""gw1""}"

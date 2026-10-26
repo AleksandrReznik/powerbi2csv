@@ -1,5 +1,5 @@
 ﻿"Pipeline","PipelineId","Order","ItemType","Item","ItemId","SourceItemId","TargetItemId","LastDeploymentTime"
-"Sales pipeline","pl1","0","reports","Sales overview","r1","","",""
 "Sales pipeline","pl1","0","datasets","Sales model","d1","","",""
-"Sales pipeline","pl1","1","reports","Sales overview","r1","","",""
+"Sales pipeline","pl1","0","reports","Sales overview","r1","","",""
 "Sales pipeline","pl1","1","datasets","Sales model","d1","","",""
+"Sales pipeline","pl1","1","reports","Sales overview","r1","","",""

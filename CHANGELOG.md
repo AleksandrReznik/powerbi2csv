@@ -2,7 +2,7 @@
 
 ## 1.0.0 - 2026-10-23
 
-First public release. 11 reports, up to 91 CSV files, 18 findings. Read-only; works with the Az sign-in of a plain
+First public release. 12 reports, up to 95 CSV files, 21 findings. Read-only; works with the Az sign-in of a plain
 workspace member, more with the Fabric administrator role.
 
 ### Power BI (`PowerBI`)
@@ -47,8 +47,19 @@ workspace member, more with the Fabric administrator role.
   data sources, gateway use. `adminDatasourceInstances.csv`: the number of workspaces that use each data source.
 - `workspaceScopeSummary.csv`: the tenant's migration scope on one page.
 - `-WorkspaceListFile` with the administrator role compares the list with the whole tenant, in both directions.
-- `-ClientScope`: a share-safe run for a customer's administrator; only the admin APIs, only scope metadata, no
-  names of items, no addresses, no code, no raw Scanner API answer, zipped.
+- `repointingMap.csv`: per workspace, also those the account cannot open, every data source host, gateway use, the
+  items and models that use it and their refresh schedules (dedicated capacities).
+- `capacityFootprint.csv`: an estimate per capacity from counts, refresh statistics and the activity log; active
+  users per workspace in `adminWorkspaces.csv`.
+- `-ClientScope`: a share-safe run for a customer's administrator; only the admin APIs and the Entra ID lookup, only
+  scope metadata, host names but no addresses, people only as counts, no item names, no code, no raw Scanner API
+  answer, zipped.
+
+### Principals (`Principals`)
+- `principals.csv`: every user, guest, group, service principal and managed identity with a role on a workspace,
+  item, capacity, gateway or deployment pipeline, or owning a model or dataflow, de-duplicated across the APIs, with
+  type, app ID, roles, workspace count, and whether the account was deleted or disabled in Entra ID (Microsoft Graph,
+  by object ID or UPN). Departed admins count as no admin in `adminWorkspaces.csv`.
 
 ### Downloads (`FabricCode`, `PowerBIExport`)
 - `FabricCode`: notebooks (Fabric source or .ipynb), pipelines, dataflows, semantic models (TMDL) and every other
@@ -62,13 +73,14 @@ workspace member, more with the Fabric administrator role.
 ### Semantic model schema (`PowerBIModels`)
 - Tables, columns, measures and relationships of every semantic model through DAX `INFO.VIEW` queries.
 
-### Findings PBI-01 to PBI-18
+### Findings PBI-01 to PBI-21
 - Failed refreshes and runs, models without an enabled refresh schedule, unused models, single-administrator
   workspaces, owners who are not members, workspaces without a capacity or without Git, items published to the web
   or shared with the whole organization, partly readable workspaces, listed workspaces that were not found,
   external targets, items that exist only in DEV or TEST, shared workspaces with content that are not on the list,
-  listed workspaces that are empty, personal or not active, shared workspaces with content and no administrator, and
-  the migration scope of the tenant.
+  listed workspaces that are empty, personal or not active, shared workspaces with content and no administrator, the
+  migration scope of the tenant, why there are so many personal workspaces, admins whose account was deleted or
+  disabled, and the data source hosts to re-point at cutover.
 
 ### Output
 - `PowerBI\*.csv` (UTF-8 with BOM, every field quoted), `findings.csv`, `coverage.csv`, a log, `__run.json`, an

@@ -1,2 +1,2 @@
 ﻿"Workspace","WorkspaceId","Pool","PoolId","Type","NodeFamily","NodeSize","AutoScale","DynamicExecutorAllocation"
-"Sales","aaaaaaaa-0000-0000-0000-000000000001","Starter Pool","sp-1","Workspace","MemoryOptimized","Medium","{""maxNodeCount"":10,""minNodeCount"":1,""enabled"":true}",""
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Starter Pool","sp-1","Workspace","MemoryOptimized","Medium","{""minNodeCount"":1,""maxNodeCount"":10,""enabled"":true}",""

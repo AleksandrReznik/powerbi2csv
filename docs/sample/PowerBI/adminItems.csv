@@ -1,6 +1,6 @@
 ﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","ConfiguredBy","CreatedDate","ModifiedDate","ModifiedBy","Endorsement","CertifiedBy","SensitivityLabelId","ModelId","TargetStorageMode","ContentProviderType","Description","Users","DatasourceIds","Upstream"
-"Sales","aaaaaaaa-0000-0000-0000-000000000001","datasets","Sales model","d1","gone@contoso.com","","","","","","","","Abf","","","0","dsi1",""
 "Sales","aaaaaaaa-0000-0000-0000-000000000001","reports","Sales overview","r1","","","","anna@contoso.com","","","","d1","","","","1","",""
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","datasets","Sales model","d1","gone@contoso.com","","","","","","","","Abf","","","0","dsi1",""
 "Sales","aaaaaaaa-0000-0000-0000-000000000001","Lakehouse","Bronze","lh1","","","","anna@contoso.com","","","","","","","","0","",""
-"Legacy reports","aaaaaaaa-0000-0000-0000-00000000000b","reports","Old KPI","r9","","","2024-03-01T00:00:00Z","","","","","d9","","","","0","",""
 "Legacy reports","aaaaaaaa-0000-0000-0000-00000000000b","datasets","Old model","d9","","2023-05-01T00:00:00Z","","","","","","","","","","0","dsi2",""
+"Legacy reports","aaaaaaaa-0000-0000-0000-00000000000b","reports","Old KPI","r9","","","2024-03-01T00:00:00Z","","","","","d9","","","","0","",""
