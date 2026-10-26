@@ -7,4 +7,4 @@
 "Sales","aaaaaaaa-0000-0000-0000-000000000001","Notebook","Transform","bbbbbbbb-0000-0000-0000-000000000001","","","","","","0","0","0","0","","","","PowerBI/Sales/Notebook/Transform"
 "Sales","aaaaaaaa-0000-0000-0000-000000000001","Report","Sales overview","r1","","","","","","0","0","0","","","","",""
 "Sales","aaaaaaaa-0000-0000-0000-000000000001","SemanticModel","Sales model","d1","","","","","","1","0","0","","","","","PowerBI/Sales/SemanticModel/Sales model"
-"Sales","aaaaaaaa-0000-0000-0000-000000000001","Warehouse","sales-dw","dw1","","","","","","0","0","0","","","","{""createdDate"":""2025-05-01T00:00:00Z"",""connectionString"":""abc.datawarehouse.fabric.microsoft.com"",""lastUpdatedTime"":""2026-09-01T00:00:00Z""}",""
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Warehouse","sales-dw","dw1","","","","","","0","0","0","","","","{""connectionString"":""abc.datawarehouse.fabric.microsoft.com"",""createdDate"":""2025-05-01T00:00:00Z"",""lastUpdatedTime"":""2026-09-01T00:00:00Z""}",""

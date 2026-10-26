@@ -1,2 +1,3 @@
 ﻿"Workspace","WorkspaceId","DisplayName","Identifier","EmailAddress","PrincipalType","AccessRight","UserType","GraphId"
 "Sales","aaaaaaaa-0000-0000-0000-000000000001","","anna@contoso.com","anna@contoso.com","User","Admin","",""
+"Legacy reports","aaaaaaaa-0000-0000-0000-00000000000b","","ben@contoso.com","ben@contoso.com","User","Viewer","",""

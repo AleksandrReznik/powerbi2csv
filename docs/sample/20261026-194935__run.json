@@ -1,16 +1,16 @@
 {
   "tool": "powerbi2csv",
   "version": "1.0.0",
-  "startedUtc": "2026-10-23T14:39:08Z",
-  "finishedUtc": "2026-10-23T14:39:09Z",
-  "durationSec": 0.4,
+  "startedUtc": "2026-10-26T17:49:35Z",
+  "finishedUtc": "2026-10-26T17:49:36Z",
+  "durationSec": 0.5,
   "host": {
-    "ClouddriveExists": false,
-    "CloudShell": false,
-    "OS": "Windows",
-    "PSEdition": "Core",
-    "AzAccounts": "9.9.9-test",
     "OutputBase": "C:\\inventory",
+    "OS": "Windows",
+    "CloudShell": false,
+    "AzAccounts": "9.9.9-test",
+    "ClouddriveExists": false,
+    "PSEdition": "Core",
     "PSVersion": "7.6.8"
   },
   "tenantId": "11111111-2222-3333-4444-555555555555",
@@ -48,6 +48,7 @@
     "workspaceFilter": [],
     "excludeWorkspace": [],
     "personalWorkspaces": false,
+    "clientScope": false,
     "refreshHistory": 20,
     "runHistory": 20,
     "workspaceListFile": false,
@@ -58,7 +59,8 @@
   },
   "workspaces": {
     "inScope": 2,
-    "visible": 3
+    "visible": 3,
+    "tenant": 5
   },
   "stages": [
     {
@@ -178,7 +180,7 @@
     {
       "Stage": "Report:PowerBIAdmin",
       "Status": "Built",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": ""
     },
     {
@@ -189,14 +191,14 @@
     }
   ],
   "apiCalls": {
-    "Retries": 0,
-    "flow": 4,
-    "onelake": 6,
-    "pbi": 59,
     "fabric": 65,
+    "sql": 3,
+    "flow": 4,
     "SleepSec": 7.0,
+    "onelake": 6,
+    "Retries": 0,
     "Throttled": 0,
-    "sql": 3
+    "pbi": 60
   },
   "files": [
     {
@@ -213,7 +215,7 @@
     },
     {
       "file": "PowerBI/adminDatasourceInstances.csv",
-      "rows": 1
+      "rows": 2
     },
     {
       "file": "PowerBI/adminDomains.csv",
@@ -221,7 +223,7 @@
     },
     {
       "file": "PowerBI/adminItems.csv",
-      "rows": 3
+      "rows": 5
     },
     {
       "file": "PowerBI/adminItemUsers.csv",
@@ -237,11 +239,11 @@
     },
     {
       "file": "PowerBI/adminWorkspaces.csv",
-      "rows": 3
+      "rows": 5
     },
     {
       "file": "PowerBI/adminWorkspaceUsers.csv",
-      "rows": 1
+      "rows": 2
     },
     {
       "file": "PowerBI/appContent.csv",
@@ -552,6 +554,10 @@
       "rows": 2
     },
     {
+      "file": "PowerBI/workspaceScopeSummary.csv",
+      "rows": 16
+    },
+    {
       "file": "PowerBI/workspaceSparkSettings.csv",
       "rows": 1
     },
@@ -561,7 +567,7 @@
     },
     {
       "file": "findings.csv",
-      "rows": 10
+      "rows": 12
     },
     {
       "file": "coverage.csv",
@@ -570,9 +576,9 @@
   ],
   "findings": {
     "High": 2,
-    "Medium": 3,
+    "Medium": 4,
     "Low": 2,
-    "Info": 3
+    "Info": 4
   },
   "coverage": [
     {
@@ -680,7 +686,7 @@
     {
       "Area": "Power BI admin (tenant-wide)",
       "Status": "Collected",
-      "Items": 3,
+      "Items": 5,
       "Detail": ""
     },
     {

@@ -414,15 +414,15 @@ Test-Case 'no unrouted requests, no schema warnings, no errors' {
 }
 Test-Case 'admin: all workspaces of the tenant with users' {
     $w = Import-TWCsv $run 'PowerBI/adminWorkspaces.csv'
-    Assert-Equal 3 $w.Count
+    Assert-Equal 5 $w.Count
     Assert-Equal '0' ($w | Where-Object { $_.Workspace -eq 'Orphaned' }).Users
     Assert-Equal '3' ($w | Where-Object { $_.Workspace -eq 'Sales' }).Items
-    Assert-Equal 1 @(Import-TWCsv $run 'PowerBI/adminWorkspaceUsers.csv').Count
+    Assert-Equal 2 @(Import-TWCsv $run 'PowerBI/adminWorkspaceUsers.csv').Count
 }
 Test-Case 'admin: Scanner API result (items of every type, access, data sources, expressions, raw JSON)' {
     $i = Import-TWCsv $run 'PowerBI/adminItems.csv'
-    Assert-Equal 'datasets, Lakehouse, reports' ((($i | ForEach-Object { $_.ItemType }) | Sort-Object) -join ', ')
-    Assert-Equal 'dsi1' ($i | Where-Object { $_.ItemType -eq 'datasets' }).DatasourceIds
+    Assert-Equal 'datasets, Lakehouse, reports' ((($i | ForEach-Object { $_.ItemType }) | Sort-Object -Unique) -join ', ')
+    Assert-Equal 'dsi1' ($i | Where-Object { $_.ItemType -eq 'datasets' -and $_.Workspace -eq 'Sales' }).DatasourceIds
     $u = Import-TWCsv $run 'PowerBI/adminItemUsers.csv'
     Assert-Equal 'Read' $u[0].AccessRight
     Assert-Equal 'sql1.contoso.com' ((Import-TWCsv $run 'PowerBI/adminDatasourceInstances.csv')[0].ConnectionDetails | ConvertFrom-Json).server
@@ -477,6 +477,73 @@ Test-Case 'FabricCode: notebooks, pipelines, dataflows, models and SQL as files,
     $r2 = Invoke-TWRun -Params @{ Reports = 'FabricCode'; PbiNotebookFormat = 'Ipynb' } -KeepWorld
     Assert-True (@($global:TWRequests | Where-Object { $_.Uri -match 'nb1/getDefinition\?format=ipynb$' }).Count -eq 1)
     Assert-True (@($global:TWRequests | Where-Object { $_.Uri -match "$($global:TWPl1)/getDefinition$" }).Count -eq 1) 'only notebooks get the format'
+}
+
+Test-Case 'admin scope: per-workspace scope, content, last change, admins, data source types and gateway' {
+    $w = Import-TWCsv $run 'PowerBI/adminWorkspaces.csv'
+    $got = ($w | Sort-Object Workspace | ForEach-Object { '{0}={1}' -f $_.Workspace, $_.Scope }) -join ' | '
+    Assert-Equal 'Legacy reports=Shared, with content | Old project=Not active (Deleted) | Orphaned=Shared, empty | PersonalWorkspace Bob=Personal, empty | Sales=Shared, with content' $got
+    $s = $w | Where-Object { $_.Workspace -eq 'Sales' }
+    Assert-Equal 'anna@contoso.com False True True 1 Sql True 1' ('{0} {1} {2} {3} {4} {5} {6} {7}' -f $s.Admins, $s.NoAdmin, $s.HasContent, $s.ChangedLast30Days, $s.RecentActivities, $s.DatasourceTypes, $s.UsesGateway, $s.Datasources)
+    $l = $w | Where-Object { $_.Workspace -eq 'Legacy reports' }
+    Assert-Equal 'True False 2024-03-01T00:00:00Z SharePointList False 0' ('{0} {1} {2} {3} {4} {5}' -f $l.NoAdmin, $l.ChangedLast30Days, $l.LastItemChange, $l.DatasourceTypes, $l.UsesGateway, $l.RecentActivities)
+    Assert-Equal '' ($w | Where-Object { $_.IsPersonal -eq 'True' }).NoAdmin 'a personal workspace has an owner, not an admin'
+    Assert-Equal '1' (Import-TWCsv $run 'PowerBI/adminDatasourceInstances.csv' | Where-Object { $_.DatasourceId -eq 'dsi2' }).Workspaces
+}
+Test-Case 'workspaceScopeSummary.csv and findings PBI-17 / PBI-18' {
+    $sum = @{}; foreach ($r in (Import-TWCsv $run 'PowerBI/workspaceScopeSummary.csv')) { $sum[$r.Measure] = $r.Count }
+    $want = [ordered]@{ 'Workspaces in the tenant' = '5'; 'Not active' = '1'; 'Personal ("My workspace")' = '1'; 'Personal, empty' = '1'; 'Shared' = '3'; 'Shared, empty' = '1'
+        'Shared with content' = '2'; 'Shared with content, on a capacity' = '1'; 'Shared with content, using a gateway' = '1'; 'Shared with content, without an admin' = '1'
+        'Shared with content, changed in the last 30 days' = '1'; 'Shared with content, with activity in the activity log' = '1'; 'Shared, not scanned' = '0'
+        'Shared with content, connected to Git' = '1'; 'Capacities' = '1' }
+    foreach ($k in $want.Keys) { Assert-Equal $want[$k] $sum[$k] $k }
+    $f = Import-TWCsv $run 'findings.csv'
+    Assert-Match ($f | Where-Object { $_.Id -eq 'PBI-17' }).Detail 'Legacy reports'
+    $p18 = $f | Where-Object { $_.Id -eq 'PBI-18' }
+    Assert-Equal '2' $p18.Count; Assert-Equal '5 workspaces: 1 personal (1 empty), 3 shared (1 empty), 1 not active' $p18.Detail
+}
+
+Write-Host 'Share-safe scope run (-ClientScope)' -ForegroundColor Cyan
+Test-Case '-ClientScope: admin APIs only, the share-safe files only, nothing sensitive in the output' {
+    $csv = Join-Path $global:TWOut 'scope.csv'
+    Set-Content -LiteralPath $csv -Encoding UTF8 -Value @('Workspace,owner', 'Sales,Anna', 'Orphaned,Eve', 'Marketing,Max', 'PersonalWorkspace Bob,Bob')
+    Reset-TWState
+    $global:TW.Admin = $true
+    $r = Invoke-TWRun -Params @{ ClientScope = $true; WorkspaceListFile = $csv; Reports = 'PowerBI,FabricCode' } -KeepWorld
+    Assert-Equal '' ($global:TWUnrouted -join ' | ')
+    Assert-Equal 0 $r.Errors.Count ($r.Errors -join ' | ')
+    Assert-Equal 'PowerBIAdmin' ($r.Selected -join ',') 'other reports are ignored'
+    $files = (Get-ChildItem -LiteralPath (Join-Path $r.OutDir 'PowerBI') -Recurse -File | ForEach-Object { $_.Name } | Sort-Object) -join ', '
+    Assert-Equal 'adminCapacities.csv, adminDatasourceInstances.csv, adminWorkspaces.csv, workspacePlan.csv, workspaceScopeSummary.csv' $files
+    Assert-True (Test-Path -LiteralPath (Join-Path $global:TWOut ($r.RunName + '.zip'))) 'zip is on'
+    $reqs = @($global:TWRequests | ForEach-Object { $_.Uri })
+    Assert-Equal 0 @($reqs | Where-Object { $_ -match 'tenantsettings|/admin/apps|widelyShared|/admin/domains|/admin/activityevents' }).Count 'no settings, apps, sharing links or activity'
+    Assert-Equal 0 @($reqs | Where-Object { $_ -notmatch '/admin/' }).Count 'only admin APIs'
+    $scan = @($global:TWRequests | Where-Object { $_.Uri -match 'getInfo' })[0].Uri
+    Assert-Match $scan 'lineage=True&datasourceDetails=True$'
+    $text = (Get-ChildItem -LiteralPath $r.OutDir -Recurse -File | Where-Object { $_.Extension -in '.csv', '.json', '.txt' } | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join "`n"
+    foreach ($secret in @('sql1.contoso.com', 'contoso.sharepoint.com', 'Sales team workspace', 'ben@contoso.com', 'vic@contoso.com', 'Sales overview', 'SUM(Sales[Amount])')) {
+        Assert-False ($text.Contains($secret)) ('found in the output: ' + $secret)
+    }
+    Assert-True ($text.Contains('anna@contoso.com')) 'workspace admins are kept'
+    Assert-Match ([IO.File]::ReadAllText($r.LogPath)) '-ClientScope: only the scope of the tenant is collected'
+    $plan = Import-TWCsv $r 'PowerBI/workspacePlan.csv'
+    $got = ($plan | ForEach-Object { '{0}|{1}|{2}|{3}' -f $_.ListedWorkspace, $_.Status, $_.Check, $_.Workspace }) -join ' / '
+    Assert-Equal ('Sales|Found||Sales / Orphaned|Found|On the list but empty|Orphaned / Marketing|Not in the tenant|| / PersonalWorkspace Bob|Found|On the list but a personal workspace|PersonalWorkspace Bob / ' +
+        '|Not on the list|Shared with content, not on the list|Legacy reports') $got
+    Assert-Equal 'Admin API Anna' ($plan[0].Source + ' ' + $plan[0].Listed_owner)
+    $sum = @{}; foreach ($x in (Import-TWCsv $r 'PowerBI/workspaceScopeSummary.csv')) { $sum[$x.Measure] = $x.Count }
+    Assert-Equal '4 1 2 1 not available from the admin APIs' ('{0} {1} {2} {3} {4}' -f $sum['On the workspace list'], $sum['On the list, not found in the tenant'], $sum['On the list, but empty, personal or not active'],
+        $sum['Shared with content, not on the list'], ((Import-TWCsv $r 'PowerBI/workspaceScopeSummary.csv') | Where-Object { $_.Measure -eq 'Shared with content, connected to Git' }).Note)
+    $ids = ((Import-TWCsv $r 'findings.csv') | ForEach-Object { $_.Id } | Sort-Object) -join ' '
+    Assert-Equal 'PBI-11 PBI-15 PBI-16 PBI-17 PBI-18' $ids
+}
+Test-Case '-ClientScope without the administrator role: a clear skip, no error, no scope files' {
+    $r = Invoke-TWRun -Params @{ ClientScope = $true }
+    Assert-Equal 0 $r.Errors.Count
+    Assert-Equal 'Skipped' (Get-TWCoverage $r 'Power BI admin (tenant-wide)')['Status']
+    Assert-Match ($r.Warnings -join ' | ') '-ClientScope needs an account with the Fabric administrator role'
+    Assert-False (Test-Path -LiteralPath (Join-Path $r.OutDir 'PowerBI\workspaceScopeSummary.csv'))
 }
 
 Write-Host 'Export' -ForegroundColor Cyan

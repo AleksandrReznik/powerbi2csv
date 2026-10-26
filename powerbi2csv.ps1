@@ -51,6 +51,14 @@ Workspaces to leave out: names (wildcards allowed) or IDs.
 .PARAMETER PbiIncludePersonalWorkspaces
 Also inventory your own "My workspace". (Other users' personal workspaces are only visible to the PowerBIAdmin report.)
 
+.PARAMETER ClientScope
+Share-safe scope run for a Fabric administrator of a customer tenant: only the admin APIs, and only what a migration
+scope needs. Writes adminWorkspaces.csv (type, state, capacity, number of users, workspace admins, item counts, last
+change seen, data source types, gateway use), adminCapacities.csv, adminDatasourceInstances.csv without addresses,
+workspaceScopeSummary.csv, workspacePlan.csv (with -WorkspaceListFile), findings and coverage. Does not collect DAX, M,
+model schemas, code, per-item users, data source addresses, tenant settings or sharing links, and writes no raw
+Scanner API answer. -Reports, -AddReports, -SkipReports and -ReportProfile are ignored; -Zip is on.
+
 .PARAMETER OutputPath
 Folder in which the run folder powerbi2csv_<yyyyMMdd-HHmmss>_<tenant> is created. Default: the current folder.
 
@@ -120,6 +128,10 @@ Shows the reports, the profiles they belong to and the files they write.
 Everything, including model tables/measures and the activity log, for the workspaces whose name starts with Finance.
 
 .EXAMPLE
+.\powerbi2csv.ps1 -ClientScope -WorkspaceListFile .\scope.xlsx
+As a Fabric administrator of a customer tenant: the migration scope only, safe to send to a consultant.
+
+.EXAMPLE
 .\powerbi2csv.ps1 -AddReports PowerBIExport -Workspace 'Sales'
 Standard inventory plus a download of the .pbix files and item definitions of the workspace Sales.
 
@@ -147,6 +159,8 @@ param(
     [string[]] $ExcludeWorkspace,
 
     [switch] $PbiIncludePersonalWorkspaces,
+
+    [switch] $ClientScope,
 
     [string] $OutputPath,
 
@@ -263,7 +277,7 @@ $script:A2CReportCatalog = @(
        Needs = @('PbiWorkspaces', 'PowerBI', 'PowerBIModels')
        Desc  = 'Tables, columns, measures and relationships of every semantic model (DAX INFO.VIEW queries, 4 per model). The service does not return the DAX expressions this way: PowerBIExport (TMDL files) and PowerBIAdmin (adminModelExpressions.csv) have them' }
     @{ Name = 'PowerBIAdmin';    Group = 'Analytics'; Speed = 'Medium'; OptIn = $false; Perm = 'Fabric administrator'
-       Files = 'PowerBI\adminWorkspaces.csv, adminWorkspaceUsers.csv, adminItems.csv, adminItemUsers.csv, adminDatasourceInstances.csv, adminModelTables.csv, adminModelExpressions.csv, tenantSettings.csv, adminCapacities.csv, adminApps.csv, widelyShared.csv, adminDomains.csv, scan\scanResult_*.json'
+       Files = 'PowerBI\adminWorkspaces.csv, workspaceScopeSummary.csv, adminWorkspaceUsers.csv, adminItems.csv, adminItemUsers.csv, adminDatasourceInstances.csv, adminModelTables.csv, adminModelExpressions.csv, tenantSettings.csv, adminCapacities.csv, adminApps.csv, widelyShared.csv, adminDomains.csv, scan\scanResult_*.json'
        Needs = @('PowerBIAdmin')
        Desc  = 'Whole tenant with the admin APIs: all workspaces (also personal and orphaned), access per item, data source lineage, model expressions (Scanner API), tenant settings. Skipped without the role' }
     @{ Name = 'PowerBIActivity'; Group = 'Analytics'; Speed = 'Slow';   OptIn = $true;  Perm = 'Fabric administrator'
@@ -2067,6 +2081,7 @@ function Get-A2CDatasetPowerBIAdmin {
         Scan = [System.Collections.Generic.List[object]]::new(); DatasourceInstances = [System.Collections.Generic.List[object]]::new()
         TenantSettings = @(); Apps = @(); PublishedToWeb = @(); OrgLinks = @(); Domains = @(); ScanFiles = 0 }
     $script:A2C.Data['PbiAdmin'] = $a
+    $cs = [bool]$script:A2C.Options.ClientScope
     $probe = Invoke-A2CPbiList -Path '/admin/capacities' -MaxRetries 2
     if (-not $probe.Ok) {
         if ($probe.Error.Status -eq 401 -or $probe.Error.Status -eq 403) { return (Get-A2CPbiAdminSkip 'Power BI admin (tenant-wide)' $probe.Error) }
@@ -2090,12 +2105,15 @@ function Get-A2CDatasetPowerBIAdmin {
     if (-not $m.Ok) { Add-A2CPbiProblem $pr 'scanner: workspace list' $m.Error }
     else {
         $ids = @($m.Json | ForEach-Object { [string]$_.id } | Where-Object { $_ })
+        # -ClientScope: no model schema, no expressions and no users per item; they never leave the service
+        $scanPath = '/admin/workspaces/getInfo?lineage=True&datasourceDetails=True'
+        if (-not $cs) { $scanPath += '&datasetSchema=True&datasetExpressions=True&getArtifactUsers=True' }
         $t0 = [DateTime]::Now
         for ($i = 0; $i -lt $ids.Count; $i += 100) {
             Write-A2CProgress -Activity 'Scanner API' -Current $i -Total $ids.Count -Started $t0
             $batch = @($ids[$i..([math]::Min($i + 99, $ids.Count - 1))])
             $body = '{"workspaces":[' + [string]::Join(',', @($batch | ForEach-Object { '"' + $_ + '"' })) + ']}'
-            $s = Invoke-A2CPbi '/admin/workspaces/getInfo?lineage=True&datasourceDetails=True&datasetSchema=True&datasetExpressions=True&getArtifactUsers=True' -Method 'POST' -Body $body -MaxRetries 2
+            $s = Invoke-A2CPbi $scanPath -Method 'POST' -Body $body -MaxRetries 2
             if (-not $s.Ok) { Add-A2CPbiProblem $pr 'scanner: start scan' $s.Error; continue }
             $scanId = [string]$s.Json.id
             $state = [string]$s.Json.status
@@ -2110,18 +2128,30 @@ function Get-A2CDatasetPowerBIAdmin {
             $res = Invoke-A2CPbi ('/admin/workspaces/scanResult/' + $scanId) -MaxRetries 2
             if (-not $res.Ok) { Add-A2CPbiProblem $pr 'scanner: scan result' $res.Error; continue }
             $a.ScanFiles++
-            Save-A2CExportFile ('PowerBI/scan/scanResult_{0:000}.json' -f $a.ScanFiles) $res.Content   # the complete answer, for what the CSVs leave out
+            if (-not $cs) { Save-A2CExportFile ('PowerBI/scan/scanResult_{0:000}.json' -f $a.ScanFiles) $res.Content }   # the complete answer, for what the CSVs leave out
             foreach ($w in @($res.Json.workspaces)) { if ($null -ne $w) { $a.Scan.Add($w) } }
             foreach ($d in @($res.Json.datasourceInstances)) { if ($null -ne $d) { $a.DatasourceInstances.Add($d) } }
         }
         Write-A2CProgress -Activity 'Scanner API' -Completed
     }
 
-    $a.Apps = Get-A2CPbiItems $pr 'admin apps' '/admin/apps?$top=5000'
-    $a.PublishedToWeb = Get-A2CPbiItems $pr 'published to web' '/admin/widelySharedArtifacts/publishedToWeb'
-    $a.OrgLinks = Get-A2CPbiItems $pr 'links shared with the organization' '/admin/widelySharedArtifacts/linksSharedToWholeOrganization'
-    $a.TenantSettings = Get-A2CPbiItems $pr 'tenant settings' '/admin/tenantsettings' 'fabric' 'tenantSettings'
-    $a.Domains = Get-A2CPbiItems $pr 'domains' '/admin/domains' 'fabric' 'domains'
+    # workspaces changed in the last 30 days (the longest the API looks back)
+    $since = $script:A2C.Now.AddDays(-30).AddHours(1).ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
+    $rm = Invoke-A2CPbi ('/admin/workspaces/modified?modifiedSince=' + [uri]::EscapeDataString($since) + '&excludePersonalWorkspaces=False&excludeInActiveWorkspaces=False') -MaxRetries 2
+    if ($rm.Ok) {
+        $recent = @{}
+        foreach ($x in @($rm.Json)) { if ($null -ne $x -and $x.id) { $recent[([string]$x.id).ToLowerInvariant()] = $true } }
+        $script:A2C.Data['PbiAdminRecent'] = $recent
+    }
+    else { Add-A2CPbiProblem $pr 'scanner: workspaces changed in the last 30 days' $rm.Error }
+
+    if (-not $cs) {
+        $a.Apps = Get-A2CPbiItems $pr 'admin apps' '/admin/apps?$top=5000'
+        $a.PublishedToWeb = Get-A2CPbiItems $pr 'published to web' '/admin/widelySharedArtifacts/publishedToWeb'
+        $a.OrgLinks = Get-A2CPbiItems $pr 'links shared with the organization' '/admin/widelySharedArtifacts/linksSharedToWholeOrganization'
+        $a.TenantSettings = Get-A2CPbiItems $pr 'tenant settings' '/admin/tenantsettings' 'fabric' 'tenantSettings'
+        $a.Domains = Get-A2CPbiItems $pr 'domains' '/admin/domains' 'fabric' 'domains'
+    }
 
     $status = $(if ($pr.Count -gt 0) { 'Partial' } else { 'Collected' })
     $note = Get-A2CPbiProblemText $pr
@@ -2376,12 +2406,15 @@ Register-A2CSchema 'PowerBI/modelMeasures.csv' ($script:A2CPbiWs + 'Model:name M
 Register-A2CSchema 'PowerBI/modelRelationships.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Relationship:name FromTable:name FromColumn:name FromCardinality ToTable:name ToColumn:name ' +
     'ToCardinality IsActive CrossFilteringBehavior Properties:json')
 
-Register-A2CSchema 'PowerBI/adminWorkspaces.csv' ($script:A2CPbiWs + 'Type State IsOnDedicatedCapacity CapacityId:guid Description:text DefaultStorageFormat Users:num Admins:upn Items:num')
+Register-A2CSchema 'PowerBI/adminWorkspaces.csv' ($script:A2CPbiWs + 'Type Scope IsPersonal State IsOnDedicatedCapacity CapacityId:guid Description:text DefaultStorageFormat ' +
+    'Users:num Admins:upn NoAdmin Items:num HasContent LastItemChange:date ChangedLast30Days RecentActivities:num DatasourceTypes Datasources:num UsesGateway ' +
+    'CreatedDate:date ModifiedDate:date')
+Register-A2CSchema 'PowerBI/workspaceScopeSummary.csv' 'Measure:note Count:num Note:note'
 Register-A2CSchema 'PowerBI/adminWorkspaceUsers.csv' ($script:A2CPbiWs + 'DisplayName:name Identifier:upn EmailAddress:upn PrincipalType AccessRight UserType GraphId:guid')
 Register-A2CSchema 'PowerBI/adminItems.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid ConfiguredBy:upn CreatedDate:date ModifiedDate:date ModifiedBy:upn Endorsement CertifiedBy:upn ' +
     'SensitivityLabelId:guid ModelId:guid TargetStorageMode ContentProviderType Description:text Users:num DatasourceIds:text Upstream:text')
 Register-A2CSchema 'PowerBI/adminItemUsers.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid DisplayName:name Identifier:upn PrincipalType AccessRight')
-Register-A2CSchema 'PowerBI/adminDatasourceInstances.csv' 'DatasourceId:guid DatasourceType GatewayId:guid ConnectionDetails:json'
+Register-A2CSchema 'PowerBI/adminDatasourceInstances.csv' 'DatasourceId:guid DatasourceType GatewayId:guid Workspaces:num ConnectionDetails:json'
 Register-A2CSchema 'PowerBI/adminModelTables.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Table:name IsHidden StorageMode Columns:num Measures:num Source:text')
 Register-A2CSchema 'PowerBI/adminModelExpressions.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Kind Table:name Name:name Expression:text Description:text')
 Register-A2CSchema 'PowerBI/tenantSettings.csv' ('SettingName Title:text TenantSettingGroup Enabled CanSpecifySecurityGroups EnabledSecurityGroups:text ExcludedSecurityGroups:text ' +
@@ -3774,10 +3807,28 @@ function New-A2CPbiWorkspacePlan {
     $nameCol = $cols[0]
     foreach ($c in $cols) { if ($c -match '(?i)^workspace') { $nameCol = $c; break } }
     $extra = @($cols | Where-Object { $_ -ne $nameCol } | ForEach-Object { @{ Source = $_; Column = 'Listed_' + ($_ -replace '[^A-Za-z0-9]+', '_').Trim('_') } })
-    Register-A2CSchema 'PowerBI/workspacePlan.csv' ('ListedWorkspace:name Status Workspace:name WorkspaceId:guid Type CapacityId:guid InScope ' + (Join-A2C @($extra | ForEach-Object { $_.Column + ':text' }) ' '))
-    $all = @($script:A2C.Data['PbiWorkspacesAll'])
+    Register-A2CSchema 'PowerBI/workspacePlan.csv' ('ListedWorkspace:name Status Check:note Workspace:name WorkspaceId:guid Type State Items:num HasContent ChangedLast30Days ' +
+        'CapacityId:guid InScope Source ' + (Join-A2C @($extra | ForEach-Object { $_.Column + ':text' }) ' '))
+    # the admin list when the account is a Fabric administrator (the whole tenant), otherwise the member's workspaces
+    $facts = Get-A2CPbiAdminFacts
+    $adminSource = ($facts.Count -gt 0)
+    $all = [System.Collections.Generic.List[object]]::new()
+    if ($adminSource) {
+        foreach ($f in $facts) { $all.Add([pscustomobject]@{ Name = $f.Name; Id = $f.Id; Type = $f.Type; CapacityId = $f.CapacityId; IsPersonal = $f.IsPersonal; State = $f.State; Active = $f.Active
+                    Items = $f.Items; HasContent = $f.HasContent; ChangedRecently = $f.ChangedRecently }) }
+    }
+    else {
+        foreach ($w in @($script:A2C.Data['PbiWorkspacesAll'])) {
+            $n = $null
+            if ($w.Status -eq 'Collected' -or $w.FabricStatus -eq 'Collected') { $n = [math]::Max(@($w.Items).Count, @($w.Reports).Count + @($w.Datasets).Count + @($w.Dashboards).Count + @($w.Dataflows).Count) }
+            $all.Add([pscustomobject]@{ Name = $w.Name; Id = $w.Id; Type = $w.Type; CapacityId = $w.CapacityId; IsPersonal = ($w.Type -eq 'Personal'); State = ''; Active = $true
+                    Items = $n; HasContent = $(if ($null -ne $n) { $n -gt 0 } else { $null }); ChangedRecently = $null })
+        }
+    }
+    $scopeKnown = ($null -ne $script:A2C.Data['PbiWorkspaces'])
     $scope = @{}
-    foreach ($w in @($script:A2C.Data['PbiWorkspaces'])) { $scope[$w.Id] = $true }
+    if ($scopeKnown) { foreach ($w in $script:A2C.Data['PbiWorkspaces']) { $scope[$w.Id] = $true } }
+    $notFound = $(if ($adminSource) { 'Not in the tenant' } else { 'Not visible to this account' })
     $norm = { param($s) (([string]$s) -replace '[^A-Za-z0-9]+', '').ToLowerInvariant() }
     $used = @{}
     $rows = [System.Collections.Generic.List[object]]::new()
@@ -3796,24 +3847,33 @@ function New-A2CPbiWorkspacePlan {
                 $dist = Get-A2CEditDistance (& $norm $name) (& $norm $w.Name)
                 if ($dist -lt $best) { $best = $dist; $hit = $w }
             }
-            if ($best -le 2) { $status = 'Found (spelled differently)' } else { $hit = $null; $status = 'Not visible to this account' }
+            if ($best -le 2) { $status = 'Found (spelled differently)' } else { $hit = $null; $status = $notFound }
         }
-        $row = [ordered]@{ ListedWorkspace = $name; Status = $status; Workspace = ''; WorkspaceId = ''; Type = ''; CapacityId = ''; InScope = '' }
+        $row = [ordered]@{ ListedWorkspace = $name; Status = $status; Check = ''; Workspace = ''; WorkspaceId = ''; Type = ''; State = ''; Items = $null; HasContent = $null
+            ChangedLast30Days = $null; CapacityId = ''; InScope = ''; Source = $(if ($adminSource) { 'Admin API' } else { 'Member' }) }
         if ($null -ne $hit) {
             $used[$hit.Id] = $true
-            $row['Workspace'] = $hit.Name; $row['WorkspaceId'] = $hit.Id; $row['Type'] = $hit.Type; $row['CapacityId'] = $hit.CapacityId; $row['InScope'] = [bool]$scope[$hit.Id]
+            $row['Workspace'] = $hit.Name; $row['WorkspaceId'] = $hit.Id; $row['Type'] = $hit.Type; $row['State'] = $hit.State; $row['Items'] = $hit.Items; $row['HasContent'] = $hit.HasContent
+            $row['ChangedLast30Days'] = $hit.ChangedRecently; $row['CapacityId'] = $hit.CapacityId; $row['InScope'] = $(if ($scopeKnown) { [bool]$scope[$hit.Id] } else { '' })
+            # the reverse question: listed, but is there anything to migrate?
+            if (-not $hit.Active) { $row['Check'] = 'On the list but not active (' + $hit.State + ')' }
+            elseif ($hit.IsPersonal) { $row['Check'] = 'On the list but a personal workspace' }
+            elseif ($hit.HasContent -eq $false) { $row['Check'] = 'On the list but empty' }
         }
         foreach ($x in $extra) { $row[$x.Column] = $l[$x.Source] }
         $rows.Add($row)
     }
     foreach ($w in @($all | Sort-Object Name)) {
-        if ($used.ContainsKey($w.Id) -or $w.Type -eq 'Personal') { continue }
-        $rows.Add([ordered]@{ ListedWorkspace = ''; Status = 'Not on the list'; Workspace = $w.Name; WorkspaceId = $w.Id; Type = $w.Type; CapacityId = $w.CapacityId; InScope = [bool]$scope[$w.Id] })
+        if ($used.ContainsKey($w.Id) -or $w.IsPersonal -or -not $w.Active) { continue }
+        $check = $(if ($w.HasContent -eq $true) { 'Shared with content, not on the list' } elseif ($w.HasContent -eq $false) { 'Shared, empty' } else { 'Shared, content unknown' })
+        $rows.Add([ordered]@{ ListedWorkspace = ''; Status = 'Not on the list'; Check = $check; Workspace = $w.Name; WorkspaceId = $w.Id; Type = $w.Type; State = $w.State; Items = $w.Items
+                HasContent = $w.HasContent; ChangedLast30Days = $w.ChangedRecently; CapacityId = $w.CapacityId; InScope = $(if ($scopeKnown) { [bool]$scope[$w.Id] } else { '' })
+                Source = $(if ($adminSource) { 'Admin API' } else { 'Member' }) })
     }
     Add-A2CRows 'PowerBI/workspacePlan.csv' $rows
-    $missing = @($rows | Where-Object { $_['Status'] -eq 'Not visible to this account' }).Count
-    Write-A2CLog -Level $(if ($missing -gt 0) { 'Notice' } else { 'Ok' }) ('Workspace list: {0} listed, {1} not visible to this account, {2} visible but not listed' -f $listed.Count, $missing,
-        @($rows | Where-Object { $_['Status'] -eq 'Not on the list' }).Count)
+    $missing = @($rows | Where-Object { $_['Status'] -eq $notFound }).Count
+    Write-A2CLog -Level $(if ($missing -gt 0) { 'Notice' } else { 'Ok' }) ('Workspace list: {0} listed, {1} {3}, {2} not on the list' -f $listed.Count, $missing,
+        @($rows | Where-Object { $_['Status'] -eq 'Not on the list' }).Count, $notFound.ToLowerInvariant())
 }
 
 function New-A2CReportFabricSql {
@@ -4029,22 +4089,28 @@ function New-A2CReportPowerBIAdmin {
         }
         $itemCount[$w.Id.ToLowerInvariant()] = $n
     }
+    $cs = [bool]$script:A2C.Options.ClientScope
+    $facts = @{}
+    foreach ($f in (Get-A2CPbiAdminFacts)) { $facts[$f.Id.ToLowerInvariant()] = $f }
     foreach ($g in $a.Workspaces) {
         $w = [pscustomobject]@{ Name = [string]$g.name; Id = [string]$g.id }
         $users = @($g.users | Where-Object { $null -ne $_ })
-        $admins = @($users | Where-Object { $_.groupUserAccessRight -eq 'Admin' } | ForEach-Object { $(if ($_.emailAddress) { $_.emailAddress } else { $_.displayName }) })
-        $n = $itemCount[$w.Id.ToLowerInvariant()]
-        $rows['adminWorkspaces'].Add((New-A2CPbiRow $w ([ordered]@{ Type = [string]$g.type; State = [string]$g.state; IsOnDedicatedCapacity = $g.isOnDedicatedCapacity
-                        CapacityId = [string]$g.capacityId; Description = [string]$g.description; DefaultStorageFormat = [string]$g.defaultDatasetStorageFormat
-                        Users = $users.Count; Admins = (Join-A2C $admins); Items = $n })))
+        $f = $facts[$w.Id.ToLowerInvariant()]
+        $rows['adminWorkspaces'].Add((New-A2CPbiRow $w ([ordered]@{ Type = [string]$g.type; Scope = $f.Scope; IsPersonal = $f.IsPersonal; State = [string]$g.state
+                        IsOnDedicatedCapacity = $g.isOnDedicatedCapacity; CapacityId = [string]$g.capacityId; Description = $(if ($cs) { '' } else { [string]$g.description })
+                        DefaultStorageFormat = [string]$g.defaultDatasetStorageFormat; Users = $users.Count; Admins = $f.Admins; NoAdmin = $f.NoAdmin; Items = $f.Items
+                        HasContent = $f.HasContent; LastItemChange = $f.LastItemChange; ChangedLast30Days = $f.ChangedRecently; RecentActivities = $f.RecentActivities
+                        DatasourceTypes = $f.DatasourceTypes; Datasources = $f.Datasources; UsesGateway = $f.UsesGateway; CreatedDate = $f.CreatedDate; ModifiedDate = $f.ModifiedDate })))
         foreach ($u in $users) {
             $rows['adminWorkspaceUsers'].Add((New-A2CPbiRow $w ([ordered]@{ DisplayName = [string]$u.displayName; Identifier = [string]$u.identifier; EmailAddress = [string]$u.emailAddress
                             PrincipalType = [string]$u.principalType; AccessRight = [string]$u.groupUserAccessRight; UserType = [string]$u.userType; GraphId = [string]$u.graphId })))
         }
     }
+    $use = $script:A2C.Data['PbiAdminInstanceUse']
     foreach ($d in $a.DatasourceInstances) {
+        # -ClientScope: the type and the gateway only, never the server, database, URL or path
         $rows['adminDatasourceInstances'].Add([ordered]@{ DatasourceId = [string]$d.datasourceId; DatasourceType = [string]$d.datasourceType; GatewayId = [string]$d.gatewayId
-                ConnectionDetails = $d.connectionDetails })
+                Workspaces = $(if ($null -ne $use) { [int]$use[([string]$d.datasourceId).ToLowerInvariant()] } else { $null }); ConnectionDetails = $(if ($cs) { $null } else { $d.connectionDetails }) })
     }
     foreach ($s in $a.TenantSettings) {
         $rows['tenantSettings'].Add([ordered]@{ SettingName = [string]$s.settingName; Title = [string]$s.title; TenantSettingGroup = [string]$s.tenantSettingGroup; Enabled = $s.enabled
@@ -4071,8 +4137,139 @@ function New-A2CReportPowerBIAdmin {
         $rows['adminDomains'].Add([ordered]@{ Domain = [string]$x.displayName; DomainId = [string]$x.id; Description = [string]$x.description; ParentDomainId = [string]$x.parentDomainId
                 ContributorsScope = [string]$x.contributorsScope })
     }
+    if ($cs) { $files = @('adminWorkspaces', 'adminCapacities', 'adminDatasourceInstances') }   # the share-safe set
     foreach ($f in $files) { Add-A2CRows ('PowerBI/' + $f + '.csv') $rows[$f] }
+    New-A2CPbiWorkspacePlan
+    New-A2CPbiScopeSummary
     Write-A2CLog -Level Ok ('Tenant-wide: {0} workspaces, {1} items, {2} tenant settings -> PowerBI folder' -f $rows['adminWorkspaces'].Count, $rows['adminItems'].Count, $rows['tenantSettings'].Count)
+}
+
+function Get-A2CPbiAdminFacts {
+    # One object per workspace of the admin list with what scope decisions need: personal or shared, active or not,
+    # content (items found by the Scanner API), last change seen, administrators, data source types, gateway use.
+    # Cached; empty when the admin report did not run or the account has no administrator role.
+    $cache = $script:A2C.Data['PbiAdminFacts']
+    if ($null -ne $cache) { return , $cache }
+    $facts = [System.Collections.Generic.List[object]]::new()
+    $script:A2C.Data['PbiAdminFacts'] = $facts
+    $a = $script:A2C.Data['PbiAdmin']
+    if ($null -eq $a -or -not (Test-A2CDataset 'PowerBIAdmin')) { return , $facts }
+    $inst = @{}
+    foreach ($d in $a.DatasourceInstances) { if ($d.datasourceId) { $inst[([string]$d.datasourceId).ToLowerInvariant()] = $d } }
+    $use = @{}   # data source instance -> number of workspaces that use it
+    $scan = @{}
+    foreach ($sw in $a.Scan) {
+        $n = 0
+        $last = $null
+        $dsIds = [System.Collections.Generic.HashSet[string]]::new()
+        foreach ($prop in $sw.PSObject.Properties) {
+            # every array of objects with an id is a list of items: reports, datasets, ... and Fabric types
+            if ($prop.Name -eq 'users' -or -not ($prop.Value -is [array])) { continue }
+            foreach ($x in $prop.Value) {
+                if ($null -eq $x) { continue }
+                if ($null -eq $x.PSObject.Properties['id'] -and $null -eq $x.PSObject.Properties['objectId']) { continue }
+                $n++
+                foreach ($dv in @((Get-A2CFirst $x @('modifiedDateTime', 'modifiedDate', 'lastUpdatedDate')), (Get-A2CFirst $x @('createdDate', 'createdDateTime')))) {
+                    $dt = ConvertTo-A2CUtc $dv
+                    if ($null -ne $dt -and ($null -eq $last -or $dt -gt $last)) { $last = $dt }
+                }
+                foreach ($u in @($x.datasourceUsages)) { if ($null -ne $u -and $u.datasourceInstanceId) { [void]$dsIds.Add(([string]$u.datasourceInstanceId).ToLowerInvariant()) } }
+            }
+        }
+        $types = [System.Collections.Generic.List[string]]::new()
+        $gw = $false
+        foreach ($k in $dsIds) {
+            $use[$k] = [int]$use[$k] + 1
+            $d = $inst[$k]
+            if ($null -eq $d) { continue }
+            if ($d.datasourceType) { $types.Add([string]$d.datasourceType) }
+            if ($d.gatewayId) { $gw = $true }
+        }
+        $scan[([string]$sw.id).ToLowerInvariant()] = [pscustomobject]@{ Items = $n; Last = $last; Types = (Get-A2CUnique $types); Gateway = $gw; Datasources = $dsIds.Count }
+    }
+    $script:A2C.Data['PbiAdminInstanceUse'] = $use
+    $recent = $script:A2C.Data['PbiAdminRecent']
+    $act = $null
+    if (Test-A2CDataset 'PowerBIActivity') {
+        $act = @{}
+        foreach ($e in @($script:A2C.Data['PbiActivity'])) { if ($null -ne $e -and $e.WorkspaceId) { $k = ([string]$e.WorkspaceId).ToLowerInvariant(); $act[$k] = [int]$act[$k] + 1 } }
+    }
+    foreach ($g in $a.Workspaces) {
+        $id = [string]$g.id
+        $k = $id.ToLowerInvariant()
+        $type = [string]$g.type
+        $personal = ($type -eq 'PersonalGroup' -or $type -eq 'Personal')
+        $state = [string]$g.state
+        $active = ($state -ne 'Deleted' -and $state -ne 'Removing')   # an Orphaned workspace still exists and may hold content
+        $users = @($g.users | Where-Object { $null -ne $_ })
+        $admins = @($users | Where-Object { $_.groupUserAccessRight -eq 'Admin' })
+        $s = $scan[$k]
+        $items = $null; $has = $null; $gw = $null; $dsn = $null; $types = ''; $last = $null
+        if ($null -ne $s) { $items = $s.Items; $has = ($s.Items -gt 0); $gw = $s.Gateway; $dsn = $s.Datasources; $types = (Join-A2C $s.Types); $last = $s.Last }
+        $kind = $(if ($personal) { 'Personal' } else { 'Shared' })
+        $scope = $(if (-not $active) { 'Not active (' + $state + ')' } elseif ($null -eq $has) { $kind + ', not scanned' } elseif ($has) { $kind + ', with content' } else { $kind + ', empty' })
+        $facts.Add([pscustomobject]@{
+                Id = $id; Name = [string]$g.name; Type = $type; IsPersonal = $personal; State = $state; Active = $active; CapacityId = [string]$g.capacityId
+                OnCapacity = ([bool]$g.isOnDedicatedCapacity -or [bool]$g.capacityId); Users = $users.Count
+                Admins = (Join-A2C @($admins | ForEach-Object { $(if ($_.emailAddress) { $_.emailAddress } elseif ($_.displayName) { $_.displayName } else { $_.identifier }) }))
+                NoAdmin = $(if ($personal) { $null } else { ($admins.Count -eq 0 -or $state -eq 'Orphaned') })
+                Items = $items; HasContent = $has; LastItemChange = $last
+                ChangedRecently = $(if ($null -ne $recent) { [bool]$recent[$k] } else { $null })
+                RecentActivities = $(if ($null -ne $act) { [int]$act[$k] } else { $null })
+                DatasourceTypes = $types; Datasources = $dsn; UsesGateway = $gw; Scope = $scope
+                CreatedDate = (Get-A2CFirst $g @('createdDate', 'createdDateTime')); ModifiedDate = (Get-A2CFirst $g @('modifiedDate', 'modifiedDateTime', 'lastUpdatedDate'))
+            })
+    }
+    return , $facts
+}
+
+function New-A2CPbiScopeSummary {
+    # workspaceScopeSummary.csv: how many of the tenant's workspaces are real migration scope, in one glance.
+    if ($script:A2C.Out.ContainsKey('PowerBI/workspaceScopeSummary.csv')) { return }
+    $f = Get-A2CPbiAdminFacts
+    if ($f.Count -eq 0) { return }
+    $act = @($f | Where-Object { $_.Active })
+    $pers = @($act | Where-Object { $_.IsPersonal })
+    $shared = @($act | Where-Object { -not $_.IsPersonal })
+    $content = @($shared | Where-Object { $_.HasContent -eq $true })
+    $rows = [System.Collections.Generic.List[object]]::new()
+    $add = { param($Measure, $Count, $Note) $rows.Add([ordered]@{ Measure = $Measure; Count = $Count; Note = $Note }) }
+    & $add 'Workspaces in the tenant' $f.Count 'all workspaces the admin API returns, also deleted and orphaned ones'
+    & $add 'Not active' @($f | Where-Object { -not $_.Active }).Count 'deleted, or being removed'
+    & $add 'Personal ("My workspace")' $pers.Count 'created automatically for every user'
+    & $add 'Personal with content' @($pers | Where-Object { $_.HasContent -eq $true }).Count 'items in someone''s My workspace: decide per owner'
+    & $add 'Personal, empty' @($pers | Where-Object { $_.HasContent -eq $false }).Count 'nothing to migrate'
+    & $add 'Shared' $shared.Count ''
+    & $add 'Shared, empty' @($shared | Where-Object { $_.HasContent -eq $false }).Count 'nothing to migrate'
+    & $add 'Shared with content' $content.Count 'the migration scope'
+    & $add 'Shared with content, on a capacity' @($content | Where-Object { $_.OnCapacity }).Count 'Premium / Fabric capacity: the target tenant needs one too'
+    & $add 'Shared with content, using a gateway' @($content | Where-Object { $_.UsesGateway -eq $true }).Count 'gateways and their connections are recreated by hand'
+    & $add 'Shared with content, without an admin' @($content | Where-Object { $_.NoAdmin -eq $true }).Count 'nobody to decide for them: find an owner first'
+    $recentKnown = @($f | Where-Object { $null -ne $_.ChangedRecently }).Count -gt 0
+    & $add 'Shared with content, changed in the last 30 days' $(if ($recentKnown) { @($content | Where-Object { $_.ChangedRecently -eq $true }).Count } else { $null }) $(if ($recentKnown) { 'in active use' } else { 'not read' })
+    if ($null -ne $content[0] -and $null -ne $content[0].RecentActivities) {
+        & $add 'Shared with content, with activity in the activity log' @($content | Where-Object { $_.RecentActivities -gt 0 }).Count ('last ' + $script:A2C.Options.PbiActivityDays + ' days')
+    }
+    & $add 'Shared, not scanned' @($shared | Where-Object { $null -eq $_.HasContent }).Count 'the Scanner API returned nothing for them: see coverage.csv'
+    $git = $null; $gitNote = 'not available from the admin APIs'
+    if ($script:A2C.Out.ContainsKey('PowerBI/workspaceGit.csv')) {
+        $ids = @{}; foreach ($c in $content) { $ids[$c.Id.ToLowerInvariant()] = $true }
+        $git = @((Get-A2CRawRows 'PowerBI/workspaceGit.csv') | Where-Object { [string]$_['State'] -like 'Connected*' -and $ids.ContainsKey(([string]$_['WorkspaceId']).ToLowerInvariant()) }).Count
+        $gitNote = 'only workspaces this account is a member of'
+    }
+    & $add 'Shared with content, connected to Git' $git $gitNote
+    $caps = $script:A2C.Data['PbiAdmin'].Capacities
+    & $add 'Capacities' @($caps).Count ''
+    if ($script:A2C.Out.ContainsKey('PowerBI/workspacePlan.csv')) {
+        $plan = Get-A2CRawRows 'PowerBI/workspacePlan.csv'
+        $listed = @($plan | Where-Object { $_['ListedWorkspace'] })
+        & $add 'On the workspace list' $listed.Count ''
+        & $add 'On the list, not found in the tenant' @($listed | Where-Object { $_['Status'] -like 'Not *' }).Count 'misspelled beyond recognition, renamed or deleted'
+        & $add 'On the list, but empty, personal or not active' @($listed | Where-Object { [string]$_['Check'] -like 'On the list but*' }).Count 'may not need a migration'
+        & $add 'Shared with content, not on the list' @($plan | Where-Object { [string]$_['Check'] -eq 'Shared with content, not on the list' }).Count 'overlooked?'
+    }
+    Add-A2CRows 'PowerBI/workspaceScopeSummary.csv' $rows
+    Write-A2CLog -Level Ok ('Scope: {0} workspaces, {1} shared with content, {2} empty personal' -f $f.Count, $content.Count, @($pers | Where-Object { $_.HasContent -eq $false }).Count)
 }
 
 function New-A2CReportPowerBIActivity {
@@ -4256,10 +4453,10 @@ Register-A2CFinding -Id 'PBI-10' -Severity Info -Category Governance -Title 'Wor
     $bad = @((Get-A2CRows 'PowerBI/workspaces.csv') | Where-Object { $_['PowerBIStatus'] -eq 'Partial' -or $_['FabricStatus'] -eq 'Partial' })
     New-A2CFindingResult $bad.Count (Get-A2CTopText @($bad | ForEach-Object { $_['Workspace'] }) 8)
 }
-Register-A2CFinding -Id 'PBI-11' -Severity Medium -Category Migration -Title 'Workspaces on the workspace list that this account cannot see' -Needs @('PbiWorkspaces') -File 'PowerBI/workspacePlan.csv' `
-    -Recommendation 'Nothing of these workspaces is in this inventory. Get added to them (Member or higher), or run the inventory as a Fabric administrator.' `
+Register-A2CFinding -Id 'PBI-11' -Severity Medium -Category Migration -Title 'Workspaces on the workspace list that were not found' -Needs @() -File 'PowerBI/workspacePlan.csv' `
+    -Recommendation 'Run as a member: nothing of them is in this inventory; get added (Member or higher) or run as a Fabric administrator. Run as an administrator: the name is wrong, or the workspace was renamed or deleted.' `
     -Url 'https://learn.microsoft.com/fabric/fundamentals/give-access-workspaces' -Evaluate {
-    $bad = @((Get-A2CRows 'PowerBI/workspacePlan.csv') | Where-Object { $_['Status'] -eq 'Not visible to this account' })
+    $bad = @((Get-A2CRows 'PowerBI/workspacePlan.csv') | Where-Object { $_['Status'] -eq 'Not visible to this account' -or $_['Status'] -eq 'Not in the tenant' })
     New-A2CFindingResult $bad.Count (Get-A2CTopText @($bad | ForEach-Object { $_['ListedWorkspace'] }) 10)
 }
 
@@ -4283,6 +4480,36 @@ Register-A2CFinding -Id 'PBI-14' -Severity Low -Category Governance -Title 'Item
     -Url 'https://learn.microsoft.com/fabric/cicd/deployment-pipelines/intro-to-deployment-pipelines' -Evaluate {
     $bad = @((Get-A2CRows 'PowerBI/environmentMatrix.csv') | Where-Object { $_['MissingIn'] -match 'PROD' })
     New-A2CFindingResult $bad.Count (Get-A2CTopText @($bad | ForEach-Object { $_['Solution'] }) 8)
+}
+Register-A2CFinding -Id 'PBI-15' -Severity Medium -Category Migration -Title 'Shared workspaces with content that are not on the workspace list' -Needs @() -File 'PowerBI/workspacePlan.csv' `
+    -Recommendation 'Overlooked, or deliberately left out? Decide for each one before the migration plan is final; the Items and ChangedLast30Days columns show which are in use.' `
+    -Url 'https://learn.microsoft.com/fabric/admin/portal-workspaces' -Evaluate {
+    $bad = @((Get-A2CRows 'PowerBI/workspacePlan.csv') | Where-Object { $_['Check'] -eq 'Shared with content, not on the list' })
+    New-A2CFindingResult $bad.Count (Get-A2CTopText @($bad | ForEach-Object { $_['Workspace'] }) 10)
+}
+
+Register-A2CFinding -Id 'PBI-16' -Severity Low -Category Migration -Title 'Workspaces on the list that are empty, personal or not active' -Needs @() -File 'PowerBI/workspacePlan.csv' `
+    -Recommendation 'These may need no migration at all. Confirm with the owners and take them off the list.' `
+    -Url 'https://learn.microsoft.com/fabric/admin/portal-workspaces' -Evaluate {
+    $bad = @((Get-A2CRows 'PowerBI/workspacePlan.csv') | Where-Object { [string]$_['Check'] -like 'On the list but*' })
+    New-A2CFindingResult $bad.Count (Get-A2CTopText @($bad | ForEach-Object { $_['ListedWorkspace'] + ': ' + ([string]$_['Check']).Replace('On the list but ', '') }) 10)
+}
+
+Register-A2CFinding -Id 'PBI-17' -Severity Medium -Category Governance -Title 'Shared workspaces with content and no administrator' -Needs @('PowerBIAdmin') -File 'PowerBI/adminWorkspaces.csv' `
+    -Recommendation 'Orphaned workspaces have nobody who can decide what happens to them. Assign an administrator (Fabric admin portal, Workspaces) before planning the move.' `
+    -Url 'https://learn.microsoft.com/fabric/admin/portal-workspaces' -Evaluate {
+    $bad = @((Get-A2CRows 'PowerBI/adminWorkspaces.csv') | Where-Object { $_['NoAdmin'] -eq $true -and $_['HasContent'] -eq $true })
+    New-A2CFindingResult $bad.Count (Get-A2CTopText @($bad | ForEach-Object { $_['Workspace'] }) 10)
+}
+
+Register-A2CFinding -Id 'PBI-18' -Severity Info -Category Migration -Title 'Migration scope: shared workspaces with content' -Needs @('PowerBIAdmin') -File 'PowerBI/workspaceScopeSummary.csv' `
+    -Recommendation 'The rest of the tenant is personal, empty or not active. workspaceScopeSummary.csv has the breakdown, adminWorkspaces.csv the Scope column per workspace.' `
+    -Url 'https://learn.microsoft.com/fabric/admin/portal-workspaces' -Evaluate {
+    $sum = @{}
+    foreach ($r in (Get-A2CRows 'PowerBI/workspaceScopeSummary.csv')) { $sum[[string]$r['Measure']] = $r['Count'] }
+    if (-not $sum.ContainsKey('Shared with content')) { return $null }
+    New-A2CFindingResult ([int]$sum['Shared with content']) ('{0} workspaces: {1} personal ({2} empty), {3} shared ({4} empty), {5} not active' -f $sum['Workspaces in the tenant'],
+        $sum['Personal ("My workspace")'], $sum['Personal, empty'], $sum['Shared'], $sum['Shared, empty'], $sum['Not active'])
 }
 # ---- end Power BI ----
 
@@ -4341,10 +4568,11 @@ function Save-A2CRunInfo {
         options     = [ordered]@{
             profile = $o.Profile; reports = @($o.Reports); addReports = @($o.AddReports); skipReports = @($o.SkipReports)
             selected = @($script:A2C.Selected); datasets = @($script:A2C.Datasets); workspaceFilter = @($o.Workspace); excludeWorkspace = @($o.ExcludeWorkspace)
-            personalWorkspaces = [bool]$o.PbiIncludePersonalWorkspaces; refreshHistory = $o.PbiRefreshHistory; runHistory = $o.PbiRunHistory; workspaceListFile = [bool]$o.WorkspaceListFile; activityDays = $o.PbiActivityDays
+            personalWorkspaces = [bool]$o.PbiIncludePersonalWorkspaces; clientScope = [bool]$o.ClientScope; refreshHistory = $o.PbiRefreshHistory; runHistory = $o.PbiRunHistory; workspaceListFile = [bool]$o.WorkspaceListFile; activityDays = $o.PbiActivityDays
             exportMaxSizeMB = $o.PbiExportMaxSizeMB; zip = [bool]$o.Zip; noExcel = [bool]$o.NoExcel
         }
-        workspaces  = [ordered]@{ inScope = @($script:A2C.Data['PbiWorkspaces']).Count; visible = $script:A2C.Data['PbiWorkspacesVisible'] }
+        workspaces  = [ordered]@{ inScope = @($script:A2C.Data['PbiWorkspaces'] | Where-Object { $null -ne $_ }).Count; visible = $script:A2C.Data['PbiWorkspacesVisible']
+            tenant = $(if ($null -ne $script:A2C.Data['PbiAdmin']) { $script:A2C.Data['PbiAdmin'].Workspaces.Count } else { $null }) }
         stages      = $script:A2C.Stages.ToArray()
         apiCalls    = $script:A2C.Stats
         files       = $files.ToArray()
@@ -4451,7 +4679,10 @@ function Write-A2CSummary {
     $dur = [DateTime]::UtcNow - $run.StartedUtc
     $high = @($run.Findings | Where-Object { $_.Severity -eq 'High' }).Count
     $calls = [int]$run.Stats['pbi'] + [int]$run.Stats['fabric'] + [int]$run.Stats['sql'] + [int]$run.Stats['onelake'] + [int]$run.Stats['flow']
-    $done = 'Done in {0:hh\:mm\:ss}: {1} workspace(s), {2} files, {3} findings ({4} high), {5} API calls.' -f $dur, @($run.Data['PbiWorkspaces']).Count, $run.Files.Count, $run.Findings.Count, $high, $calls
+    $wsCount = @($run.Data['PbiWorkspaces'] | Where-Object { $null -ne $_ }).Count
+    $adminWs = $run.Data['PbiAdmin']
+    if ($null -ne $adminWs -and $adminWs.Workspaces.Count -gt $wsCount) { $wsCount = $adminWs.Workspaces.Count }
+    $done = 'Done in {0:hh\:mm\:ss}: {1} workspace(s), {2} files, {3} findings ({4} high), {5} API calls.' -f $dur, $wsCount, $run.Files.Count, $run.Findings.Count, $high, $calls
     Add-A2CLogLine -Level Ok $done
     Write-Host ''
     Write-Host $done -ForegroundColor Green
@@ -4513,7 +4744,7 @@ function Resolve-A2CListArguments {
 function New-A2COptions {
     param([System.Collections.IDictionary] $Params)
     $o = [ordered]@{
-        TenantId = ''; Workspace = @(); ExcludeWorkspace = @(); PbiIncludePersonalWorkspaces = $false; OutputPath = ''
+        TenantId = ''; Workspace = @(); ExcludeWorkspace = @(); PbiIncludePersonalWorkspaces = $false; OutputPath = ''; ClientScope = $false; ClientScopeIgnored = $false
         Profile = 'Standard'; Reports = @(); AddReports = @(); SkipReports = @(); ListReports = $false
         SelectionSpecified = $false
         PbiRefreshHistory = 20; PbiRunHistory = 20; WorkspaceListFile = ''; PbiNotebookFormat = 'Source'; PbiActivityDays = 7; PbiExportMaxSizeMB = 1024
@@ -4547,6 +4778,11 @@ function New-A2COptions {
         $o.WorkspaceListFile = (Resolve-Path -LiteralPath $o.WorkspaceListFile).ProviderPath
     }
     if (-not $script:A2CProfiles.Contains([string]$o.Profile)) { throw ("Unknown profile '{0}'" -f $o.Profile) }
+    if ($o.ClientScope) {
+        # share-safe scope run: the admin report only, whatever else was asked for
+        $o.ClientScopeIgnored = ($o.SelectionSpecified -and (@($o.Reports) + @($o.AddReports) + @($o.SkipReports)).Count -gt 0)
+        $o.Reports = @('PowerBIAdmin'); $o.AddReports = @(); $o.SkipReports = @(); $o.Zip = $true; $o.SelectionSpecified = $true
+    }
     return [pscustomobject]$o
 }
 
@@ -4753,6 +4989,12 @@ function Invoke-A2CRun {
     Initialize-A2COutputFolder
     Write-A2CLog ('Tenant {0}, signed in as {1}' -f $run.TenantId, $run.Account)
     Write-A2CLog ('Output folder: {0}' -f $run.OutDir)
+    if ($Options.ClientScope) {
+        Write-A2CLog -Level Notice '-ClientScope: only the scope of the tenant is collected, through the admin APIs.'
+        Write-A2CLog -Level Detail 'Collected: workspaces with type, state, capacity, number of users, workspace admins, item counts, last change seen, data source types and gateway use; capacities.'
+        Write-A2CLog -Level Detail 'Not collected: item names, users other than workspace admins, data source addresses, model schemas, DAX and M, code, tenant settings, sharing links, raw Scanner API answers.'
+        if ($Options.ClientScopeIgnored) { Write-A2CLog -Level Notice '-Reports / -AddReports / -SkipReports are ignored with -ClientScope.' }
+    }
     if ($run.Env.CloudShell -and -not $run.Env.ClouddriveExists) {
         Write-A2CLog -Level Warn 'Cloud Shell without a clouddrive: files are lost when the session ends - download the zip before closing.'
     }
@@ -4760,6 +5002,9 @@ function Invoke-A2CRun {
     foreach ($d in $run.Datasets) {
         Invoke-A2CDataset -Name $d
         if ($d -eq 'PbiWorkspaces' -and $run.DatasetStatus['PbiWorkspaces'] -eq 'Failed') { throw 'Cannot continue without the workspace list.' }
+    }
+    if ($Options.ClientScope -and -not (Test-A2CDataset 'PowerBIAdmin')) {
+        Write-A2CLog -Level Warn '-ClientScope needs an account with the Fabric administrator role: nothing of the tenant was collected (coverage.csv has the reason).'
     }
 
     Write-A2CLog -Level Step 'Building reports'

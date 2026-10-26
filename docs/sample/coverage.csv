@@ -16,6 +16,6 @@
 "OneLake storage","Partial","2","1 of 3 not readable: Sales / sales-dw: HTTP 403 AuthorizationPermissionMismatch: This request is not authorized"
 "Power Automate","Partial","1","1 environment(s), 1 flow(s); only the flows this account owns or co-owns (all flows need the Power Platform administrator role)"
 "Semantic model schema (DAX INFO.VIEW)","Partial","1","1 model(s) not readable: Sales / Unused model: HTTP 400 DatasetExecuteQueriesError: Query execution is disabled"
-"Power BI admin (tenant-wide)","Collected","3",""
+"Power BI admin (tenant-wide)","Collected","5",""
 "Power BI activity log","Collected","3","2 day(s)."
 "Report PowerBIExport","NotSelected","","PowerBI\exportIndex.csv, PowerBI\<workspace>\reports\*.pbix, PowerBI\<workspace>\<item type>\<item>\* (definitions), PowerBI\<workspace>\dataflows\*.json, PowerBI\<workspace>\sql\<database>\*.sql"

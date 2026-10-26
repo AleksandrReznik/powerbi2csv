@@ -98,10 +98,15 @@ function New-TWWorld {
     # admin (only reached when $global:TW.Admin)
     $pbi.Add((New-TWRoute GET '^/admin/capacities$' { New-TWList @(@{ id = $global:TWCap; displayName = 'cap-prod'; sku = 'F64'; region = 'West Europe'; state = 'Active'; admins = @('anna@contoso.com') }) }))
     $pbi.Add((New-TWRoute GET '^/admin/groups\?' { New-TWList @(
-                    @{ id = $global:TWW1; name = 'Sales'; type = 'Workspace'; state = 'Active'; isOnDedicatedCapacity = $true; capacityId = $global:TWCap; users = @(@{ identifier = 'anna@contoso.com'; emailAddress = 'anna@contoso.com'; groupUserAccessRight = 'Admin'; principalType = 'User' }) },
+                    @{ id = $global:TWW1; name = 'Sales'; description = 'Sales team workspace'; type = 'Workspace'; state = 'Active'; isOnDedicatedCapacity = $true; capacityId = $global:TWCap; users = @(@{ identifier = 'anna@contoso.com'; emailAddress = 'anna@contoso.com'; groupUserAccessRight = 'Admin'; principalType = 'User' }) },
                     @{ id = 'aaaaaaaa-0000-0000-0000-000000000009'; name = 'Orphaned'; type = 'Workspace'; state = 'Active'; isOnDedicatedCapacity = $false; users = @() },
-                    @{ id = 'aaaaaaaa-0000-0000-0000-00000000000a'; name = 'PersonalWorkspace Bob'; type = 'PersonalGroup'; state = 'Active'; users = @() }) }))
-    $pbi.Add((New-TWRoute GET '^/admin/workspaces/modified\?' { , @(@{ id = $global:TWW1 }, @{ id = 'aaaaaaaa-0000-0000-0000-000000000009' }) }))
+                    @{ id = 'aaaaaaaa-0000-0000-0000-00000000000a'; name = 'PersonalWorkspace Bob'; type = 'PersonalGroup'; state = 'Active'; users = @() },
+                    @{ id = 'aaaaaaaa-0000-0000-0000-00000000000b'; name = 'Legacy reports'; type = 'Workspace'; state = 'Active'; isOnDedicatedCapacity = $false
+                        users = @(@{ identifier = 'ben@contoso.com'; emailAddress = 'ben@contoso.com'; groupUserAccessRight = 'Viewer'; principalType = 'User' }) },
+                    @{ id = 'aaaaaaaa-0000-0000-0000-00000000000c'; name = 'Old project'; type = 'Workspace'; state = 'Deleted'; users = @() }) }))
+    $pbi.Add((New-TWRoute GET '^/admin/workspaces/modified\?modifiedSince=' { , @(@{ id = $global:TWW1 }) }))
+    $pbi.Add((New-TWRoute GET '^/admin/workspaces/modified\?' { , @(@{ id = $global:TWW1 }, @{ id = 'aaaaaaaa-0000-0000-0000-000000000009' }, @{ id = 'aaaaaaaa-0000-0000-0000-00000000000a' },
+                    @{ id = 'aaaaaaaa-0000-0000-0000-00000000000b' }) }))
     $pbi.Add((New-TWRoute POST '^/admin/workspaces/getInfo\?' { @{ StatusCode = 202; Content = '{"id":"scan1","status":"NotStarted"}'; Headers = @{} } }))
     $pbi.Add((New-TWRoute GET '^/admin/workspaces/scanStatus/scan1$' { @{ id = 'scan1'; status = 'Succeeded' } }))
     $pbi.Add((New-TWRoute GET '^/admin/workspaces/scanResult/scan1$' { @{
@@ -111,14 +116,20 @@ function New-TWWorld {
                                     expressions = @(@{ name = 'ServerName'; expression = '"sql1.contoso.com" meta [IsParameterQuery=true]' })
                                     tables = @(@{ name = 'Sales'; columns = @(@{ name = 'Amount'; dataType = 'Double' }); measures = @(@{ name = 'Total Sales'; expression = 'SUM(Sales[Amount])' }); source = @(@{ expression = 'let Source = Sql.Database(ServerName, "Sales") in Source' }) }) })
                             dashboards = @(); dataflows = @()
-                            Lakehouse = @(@{ id = 'lh1'; name = 'Bronze'; modifiedBy = 'anna@contoso.com' }) })
-                    datasourceInstances = @(@{ datasourceId = 'dsi1'; datasourceType = 'Sql'; connectionDetails = @{ server = 'sql1.contoso.com'; database = 'Sales' }; gatewayId = 'gw1' }) } }))
+                            Lakehouse = @(@{ id = 'lh1'; name = 'Bronze'; modifiedBy = 'anna@contoso.com' }) },
+                        @{ id = 'aaaaaaaa-0000-0000-0000-000000000009'; name = 'Orphaned'; type = 'Workspace'; state = 'Active'; reports = @(); datasets = @() },
+                        @{ id = 'aaaaaaaa-0000-0000-0000-00000000000a'; name = 'PersonalWorkspace Bob'; type = 'PersonalGroup'; state = 'Active'; reports = @() },
+                        @{ id = 'aaaaaaaa-0000-0000-0000-00000000000b'; name = 'Legacy reports'; type = 'Workspace'; state = 'Active'
+                            reports = @(@{ id = 'r9'; name = 'Old KPI'; datasetId = 'd9'; modifiedDateTime = '2024-03-01T00:00:00Z' })
+                            datasets = @(@{ id = 'd9'; name = 'Old model'; createdDate = '2023-05-01T00:00:00Z'; datasourceUsages = @(@{ datasourceInstanceId = 'dsi2' }) }) })
+                    datasourceInstances = @(@{ datasourceId = 'dsi1'; datasourceType = 'Sql'; connectionDetails = @{ server = 'sql1.contoso.com'; database = 'Sales' }; gatewayId = 'gw1' },
+                        @{ datasourceId = 'dsi2'; datasourceType = 'SharePointList'; connectionDetails = @{ url = 'https://contoso.sharepoint.com/sites/Old' } }) } }))
     $pbi.Add((New-TWRoute GET '^/admin/apps\?' { New-TWList @(@{ id = 'app1'; name = 'Sales app'; workspaceId = $global:TWW1 }) }))
     $pbi.Add((New-TWRoute GET '^/admin/widelySharedArtifacts/publishedToWeb$' { @{ ArtifactAccessEntities = @(@{ artifactId = 'r1'; displayName = 'Sales overview'; artifactType = 'Report'; shareType = 'PublishToWeb'; sharer = @{ emailAddress = 'anna@contoso.com'; principalType = 'User' } }) } }))
     $pbi.Add((New-TWRoute GET '^/admin/widelySharedArtifacts/linksSharedToWholeOrganization$' { @{ ArtifactAccessEntities = @() } }))
     $pbi.Add((New-TWRoute GET '^/admin/activityevents\?.*continuationToken=' { @{ activityEventEntities = @(@{ Id = 'e3'; CreationTime = '2026-09-28T12:00:00Z'; UserId = 'vic@contoso.com'; Activity = 'ExportReport'; Operation = 'ExportReport' }) } }))
     $pbi.Add((New-TWRoute GET '^/admin/activityevents\?startDateTime=.2026-09-28' { @{
-                    activityEventEntities = @(@{ Id = 'e1'; CreationTime = '2026-09-28T10:00:00Z'; UserId = 'vic@contoso.com'; Activity = 'ViewReport'; Operation = 'ViewReport'; WorkSpaceName = 'Sales'; ReportName = 'Sales overview'; IsSuccess = $true },
+                    activityEventEntities = @(@{ Id = 'e1'; WorkspaceId = $global:TWW1; CreationTime = '2026-09-28T10:00:00Z'; UserId = 'vic@contoso.com'; Activity = 'ViewReport'; Operation = 'ViewReport'; WorkSpaceName = 'Sales'; ReportName = 'Sales overview'; IsSuccess = $true },
                         @{ Id = 'e2'; CreationTime = '2026-09-28T11:00:00Z'; UserId = 'anna@contoso.com'; Activity = 'ShareReport'; Operation = 'ShareReport' })
                     continuationUri = 'https://api.powerbi.com/v1.0/myorg/admin/activityevents?continuationToken=abc' } }))
     $pbi.Add((New-TWRoute GET '^/admin/activityevents\?' { @{ activityEventEntities = @(); continuationUri = $null } }))

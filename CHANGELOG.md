@@ -2,7 +2,7 @@
 
 ## 1.0.0 - 2026-10-23
 
-First public release. 11 reports, up to 90 CSV files, 14 findings. Read-only; works with the Az sign-in of a plain
+First public release. 11 reports, up to 91 CSV files, 18 findings. Read-only; works with the Az sign-in of a plain
 workspace member, more with the Fabric administrator role.
 
 ### Power BI (`PowerBI`)
@@ -41,6 +41,15 @@ workspace member, more with the Fabric administrator role.
 - All workspaces including personal and orphaned ones, users per item, Scanner API metadata (data sources, model
   tables and expressions), tenant settings, admin capacities and apps, widely shared items, domains; the activity log.
 
+### Migration scope for administrators (`PowerBIAdmin`, `-ClientScope`)
+- `adminWorkspaces.csv` per workspace: scope (personal or shared, with content or empty, not active), item count, last
+  change seen, changed in the last 30 days, activity count, admins and a NoAdmin flag, data source types, number of
+  data sources, gateway use. `adminDatasourceInstances.csv`: the number of workspaces that use each data source.
+- `workspaceScopeSummary.csv`: the tenant's migration scope on one page.
+- `-WorkspaceListFile` with the administrator role compares the list with the whole tenant, in both directions.
+- `-ClientScope`: a share-safe run for a customer's administrator; only the admin APIs, only scope metadata, no
+  names of items, no addresses, no code, no raw Scanner API answer, zipped.
+
 ### Downloads (`FabricCode`, `PowerBIExport`)
 - `FabricCode`: notebooks (Fabric source or .ipynb), pipelines, dataflows, semantic models (TMDL) and every other
   item type with a definition, dataflow gen1 definitions, and the SQL of views and procedures, as files.
@@ -53,11 +62,13 @@ workspace member, more with the Fabric administrator role.
 ### Semantic model schema (`PowerBIModels`)
 - Tables, columns, measures and relationships of every semantic model through DAX `INFO.VIEW` queries.
 
-### Findings PBI-01 to PBI-14
+### Findings PBI-01 to PBI-18
 - Failed refreshes and runs, models without an enabled refresh schedule, unused models, single-administrator
   workspaces, owners who are not members, workspaces without a capacity or without Git, items published to the web
-  or shared with the whole organization, partly readable workspaces, listed workspaces the account cannot see,
-  external targets, items that exist only in DEV or TEST.
+  or shared with the whole organization, partly readable workspaces, listed workspaces that were not found,
+  external targets, items that exist only in DEV or TEST, shared workspaces with content that are not on the list,
+  listed workspaces that are empty, personal or not active, shared workspaces with content and no administrator, and
+  the migration scope of the tenant.
 
 ### Output
 - `PowerBI\*.csv` (UTF-8 with BOM, every field quoted), `findings.csv`, `coverage.csv`, a log, `__run.json`, an
