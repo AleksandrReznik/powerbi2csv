@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 1.0.0
+.VERSION 1.1.0
 .GUID 6f0b1c0e-6a55-4f6b-9a0b-0d0c6f3d7e21
 .AUTHOR Aleksandr Reznik
 .COMPANYNAME it4it.solutions
@@ -9,6 +9,8 @@
 .PROJECTURI https://github.com/AleksandrReznik/powerbi2csv
 .EXTERNALMODULEDEPENDENCIES Az.Accounts
 .RELEASENOTES
+1.1.0 Migration scope for administrators, share-safe -ClientScope run, principals, re-pointing map,
+usage estimate, findings PBI-15 to PBI-21: 12 reports, up to 95 CSV files, 21 findings.
 1.0.0 First public release: 11 reports, up to 90 CSV files, 14 findings. Same structure and helpers as azure2csv.ps1
 so that the Power BI blocks can be merged into it. See CHANGELOG.md.
 #>
@@ -231,7 +233,7 @@ Set-StrictMode -Version 1.0
 
 #region ============================== 1. CONSTANTS AND CATALOGS ======================================
 
-$script:A2CVersion = '1.0.0'
+$script:A2CVersion = '1.1.0'
 $script:A2CBrand = [ordered]@{
     Tool    = 'powerbi2csv'
     Author  = 'Aleksandr Reznik'

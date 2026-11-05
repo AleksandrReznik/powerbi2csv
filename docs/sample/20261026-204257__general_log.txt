@@ -1,4 +1,4 @@
-﻿[20:42:57] INFO    powerbi2csv 1.0.0  -  https://it4it.solutions  -  aleksandr@reznik.lt
+﻿[20:42:57] INFO    powerbi2csv 1.1.0  -  https://it4it.solutions  -  aleksandr@reznik.lt
 [20:42:57] INFO    Reports (11): PowerBI, Fabric, FabricSql, Dependencies, FabricCode, FabricStorage, PowerAutomate, PowerBIModels, PowerBIAdmin, PowerBIActivity, Principals
 [20:42:57] INFO    PowerShell 7.6.8, Az.Accounts 9.9.9-test
 [20:42:57] INFO    Tenant 11111111-2222-3333-4444-555555555555, signed in as tester@contoso.com
