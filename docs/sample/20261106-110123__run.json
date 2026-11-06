@@ -1,17 +1,17 @@
 {
   "tool": "powerbi2csv",
-  "version": "1.1.0",
-  "startedUtc": "2026-10-26T18:42:57Z",
-  "finishedUtc": "2026-10-26T18:42:59Z",
-  "durationSec": 1.3,
+  "version": "1.2.0",
+  "startedUtc": "2026-11-06T09:01:23Z",
+  "finishedUtc": "2026-11-06T09:01:25Z",
+  "durationSec": 2.1,
   "host": {
-    "ClouddriveExists": false,
     "PSEdition": "Core",
-    "OS": "Windows",
-    "PSVersion": "7.6.8",
-    "AzAccounts": "9.9.9-test",
     "OutputBase": "C:\\inventory",
-    "CloudShell": false
+    "PSVersion": "7.4.13",
+    "AzAccounts": "9.9.9-test",
+    "CloudShell": false,
+    "ClouddriveExists": false,
+    "OS": "Windows"
   },
   "tenantId": "11111111-2222-3333-4444-555555555555",
   "account": "tester@contoso.com",
@@ -68,7 +68,7 @@
     {
       "Stage": "Dataset:PbiWorkspaces",
       "Status": "Collected",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": "2 of 3 visible workspace(s) in scope; \"My workspace\" left out (-PbiIncludePersonalWorkspaces adds it)"
     },
     {
@@ -134,19 +134,19 @@
     {
       "Stage": "Dataset:Principals",
       "Status": "Collected",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": "6 principal(s), 6 looked up in Entra ID"
     },
     {
       "Stage": "Report:PowerBI",
       "Status": "Built",
-      "DurationSec": 0.0,
+      "DurationSec": 0.3,
       "Note": ""
     },
     {
       "Stage": "Report:Fabric",
       "Status": "Built",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": ""
     },
     {
@@ -158,7 +158,7 @@
     {
       "Stage": "Report:Dependencies",
       "Status": "Built",
-      "DurationSec": 0.0,
+      "DurationSec": 0.1,
       "Note": ""
     },
     {
@@ -205,15 +205,15 @@
     }
   ],
   "apiCalls": {
-    "pbi": 61,
-    "SleepSec": 7.0,
-    "graph": 3,
     "Throttled": 0,
     "fabric": 65,
-    "sql": 3,
+    "graph": 3,
+    "flow": 4,
     "Retries": 0,
+    "SleepSec": 7.0,
     "onelake": 6,
-    "flow": 4
+    "sql": 3,
+    "pbi": 63
   },
   "files": [
     {
@@ -286,7 +286,7 @@
     },
     {
       "file": "PowerBI/connections.csv",
-      "rows": 1
+      "rows": 2
     },
     {
       "file": "PowerBI/dashboards.csv",
@@ -342,7 +342,7 @@
     },
     {
       "file": "PowerBI/externalDependencies.csv",
-      "rows": 8
+      "rows": 9
     },
     {
       "file": "PowerBI/fabricItems.csv",
@@ -421,6 +421,10 @@
       "rows": 1
     },
     {
+      "file": "PowerBI/modelMigration.csv",
+      "rows": 3
+    },
+    {
       "file": "PowerBI/modelPartitions.csv",
       "rows": 2
     },
@@ -482,7 +486,7 @@
     },
     {
       "file": "PowerBI/refreshables.csv",
-      "rows": 0
+      "rows": 1
     },
     {
       "file": "PowerBI/refreshHistory.csv",
@@ -553,6 +557,10 @@
       "rows": 1
     },
     {
+      "file": "PowerBI/targetConnections.csv",
+      "rows": 4
+    },
+    {
       "file": "PowerBI/tenantSettings.csv",
       "rows": 2
     },
@@ -582,7 +590,7 @@
     },
     {
       "file": "PowerBI/workspaceScopeSummary.csv",
-      "rows": 25
+      "rows": 36
     },
     {
       "file": "PowerBI/workspaceSparkSettings.csv",
@@ -594,18 +602,18 @@
     },
     {
       "file": "findings.csv",
-      "rows": 15
+      "rows": 18
     },
     {
       "file": "coverage.csv",
-      "rows": 21
+      "rows": 22
     }
   ],
   "findings": {
     "High": 2,
-    "Medium": 5,
+    "Medium": 7,
     "Low": 2,
-    "Info": 6
+    "Info": 7
   },
   "coverage": [
     {
@@ -647,7 +655,7 @@
     {
       "Area": "Fabric connections, gateways, capacities",
       "Status": "Collected",
-      "Items": 4,
+      "Items": 5,
       "Detail": ""
     },
     {
@@ -709,6 +717,12 @@
       "Status": "Partial",
       "Items": 1,
       "Detail": "1 model(s) not readable: Sales / Unused model: HTTP 400 DatasetExecuteQueriesError: Query execution is disabled"
+    },
+    {
+      "Area": "Refresh history as administrator",
+      "Status": "Partial",
+      "Items": 0,
+      "Detail": "0 model(s) in 1 workspace(s) outside the PowerBI report; 1 workspace(s) refused (the account has no role there: the admin role does not open refresh history)"
     },
     {
       "Area": "Power BI admin (tenant-wide)",

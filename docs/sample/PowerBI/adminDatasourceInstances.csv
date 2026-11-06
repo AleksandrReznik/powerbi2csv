@@ -1,3 +1,3 @@
 ﻿"DatasourceId","DatasourceType","GatewayId","Workspaces","ConnectionDetails"
 "dsi1","Sql","gw1","1","{""database"":""Sales"",""server"":""sql1.contoso.com""}"
-"dsi2","SharePointList","","1","{""url"":""https://contoso.sharepoint.com/sites/Old""}"
+"dsi2","SharePointList","cgw1","1","{""url"":""https://contoso.sharepoint.com/sites/Old""}"

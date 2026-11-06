@@ -1,2 +1,2 @@
 ﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","Shortcut","Path","TargetType","TargetConnection","TargetConnectionId","TargetLocation","TargetSubpath","TargetWorkspace","TargetItem","Target"
-"Sales","aaaaaaaa-0000-0000-0000-000000000001","Lakehouse","Bronze","lh1","raw","Files","AdlsGen2","","","https://stor.dfs.core.windows.net","/raw","","","{""adlsGen2"":{""subpath"":""/raw"",""location"":""https://stor.dfs.core.windows.net""},""type"":""AdlsGen2""}"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Lakehouse","Bronze","lh1","raw","Files","AdlsGen2","","","https://stor.dfs.core.windows.net","/raw","","","{""type"":""AdlsGen2"",""adlsGen2"":{""subpath"":""/raw"",""location"":""https://stor.dfs.core.windows.net""}}"

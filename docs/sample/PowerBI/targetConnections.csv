@@ -1,0 +1,5 @@
+﻿"Connectivity","DatasourceType","Kind","Targets","Hosts","Models","Items","Workspaces","CredentialTypes","PersonalBindings","Note"
+"On-premises gateway","Sql","SQL","1","sql1.contoso.com","1","1","1","Basic","0","install a gateway in the target tenant and create these data sources on it"
+"Cloud","SharePointList","SharePoint","1","contoso.sharepoint.com","1","1","1","OAuth2","1","create shared cloud connections in the target tenant, with a service principal or workspace identity where the source allows it"
+"Cloud","SQL","SQL","1","sql1.contoso.com","0","1","1","","0","create shared cloud connections in the target tenant, with a service principal or workspace identity where the source allows it"
+"Cloud","Web","Web","1","api.contoso.com","0","1","1","","0","create shared cloud connections in the target tenant, with a service principal or workspace identity where the source allows it"

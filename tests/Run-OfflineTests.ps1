@@ -263,6 +263,42 @@ Test-Case 'semantic model definition: partitions and modes, DAX of measures and 
     Assert-Equal 'Reference Sql.Databases Warehouse sales-dw' ('{0} {1} {2} {3}' -f $s[0].Query, $s[0].Connector, $s[0].TargetItemType, $s[0].TargetItem)
     $m = Import-TWCsv $run 'PowerBI/semanticModels.csv' | Where-Object { $_.ModelId -eq 'd1' }
     Assert-Equal 'directLake (1); import (1) 2 1' ('{0} {1} {2}' -f $m.StorageModes, $m.Measures, $m.RlsRoles)
+    Assert-Equal 'Composite True' ('{0} {1}' -f $m.AccessMode, $m.IsComposite) 'Direct Lake and import partitions in one model'
+}
+Test-Case 'model migration as a member: access mode, gateway type, refresh identity and health, connection targets' {
+    $ds = (Import-TWCsv $run 'PowerBI/semanticModelDatasources.csv')[0]
+    Assert-Equal 'gw1 OnPremises' ($ds.GatewayId + ' ' + $ds.GatewayType)
+    $m = Import-TWCsv $run 'PowerBI/modelMigration.csv'
+    $d1 = $m | Where-Object { $_.ModelId -eq 'd1' }
+    Assert-Equal 'Composite Definition OnPremises True' ('{0} {1} {2} {3}' -f $d1.AccessMode, $d1.ModeSource, $d1.GatewayType, $d1.OnPremGateway)
+    Assert-Equal 'Gateway connection (Basic) No Yes' ('{0} {1} {2}' -f $d1.RefreshIdentity, $d1.PersonalCredential, $d1.StoredPassword) 'bound to connection c1'
+    Assert-Equal 'Failed 2 1 50 Refresh history' ('{0} {1} {2} {3} {4}' -f $d1.LastRefreshStatus, $d1.Refreshes, $d1.RefreshFailures, $d1.FailureRatePct, $d1.RefreshSource)
+    Assert-Equal 'Manual (composite / live / push)' $d1.HandlingClass
+    Assert-Equal 'Unknown Check (mode not known)' (($m | Where-Object { $_.ModelId -eq 'd2' }) | ForEach-Object { $_.AccessMode + ' ' + $_.HandlingClass })
+    $t = Import-TWCsv $run 'PowerBI/targetConnections.csv'
+    Assert-Equal 'On-premises gateway Sql 1 sql1.contoso.com 1 Basic' ('{0} {1} {2} {3} {4} {5}' -f $t[0].Connectivity, $t[0].DatasourceType, $t[0].Targets, $t[0].Hosts, $t[0].Models, $t[0].CredentialTypes)
+    Assert-True (@($t | Where-Object { $_.DatasourceType -eq 'Web' -and $_.Connectivity -eq 'Cloud' }).Count -eq 1) 'dataflow data sources are targets too'
+    Assert-Equal 0 @(Import-TWCsv $run 'PowerBI/refreshables.csv').Count 'no capacity admin, no admin role'
+}
+Test-Case 'access mode: default mode of the model, DirectQuery over a semantic model, admin content type, live connection, batch size' {
+    $tm = "model Model`n`tculture: en-US`n`tdefaultMode: directQuery`n"
+    $tt = "table Orders`n`n`tpartition Orders = m`n`t`tsource =`n`t`t`t`tlet x = 1 in x`n`n`tpartition Calc = calculated`n`t`tmode: import`n`t`tsource = {1}`n"
+    $flat = { param([string] $Text) @((Get-A2CTmdlObjects $Text) | ForEach-Object { $_ }) }   # the parser returns its list as one object
+    $objs = @(& $flat $tm) + @(& $flat $tt)
+    Assert-Equal 'directQuery' (Get-A2CPbiModelDefaultMode $objs)
+    Assert-Equal 'directQuery' (Get-A2CPbiPartitionMode ($objs | Where-Object { $_.Name -eq 'Orders' }) 'directQuery') 'a partition without a mode takes the model default'
+    $script:A2C.Data['PbiModelObjects'] = @{ 'm1' = $objs }
+    $a = Get-A2CPbiModelAccessMode 'm1' $null $null @()
+    Assert-Equal 'DirectQuery False Definition' ('{0} {1} {2}' -f $a.Mode, $a.IsComposite, $a.Source) 'the calculated partition does not count'
+    $chain = @(& $flat "expression 'DirectQuery to AS - Sales' =`n`t`tlet Source = AnalysisServices.Database(`"powerbi://api.powerbi.com/v1.0/myorg/Sales`", `"Sales model`") in Source`n") +
+        @(& $flat "table Sales`n`n`tpartition Sales = entity`n`t`tmode: directQuery`n`t`tsource`n`t`t`tentityName: Sales`n`t`t`texpressionSource: 'DirectQuery to AS - Sales'`n")
+    $script:A2C.Data['PbiModelObjects']['m2'] = $chain
+    $c = Get-A2CPbiModelAccessMode 'm2' $null $null @()
+    Assert-Equal 'Composite True' ('{0} {1}' -f $c.Mode, $c.DirectQueryToModel) 'DirectQuery over another semantic model'
+    Assert-Equal 'Composite' (Get-A2CPbiModelAccessMode 'm3' $null ([pscustomobject]@{ contentProviderType = 'PbixInCompositeMode' }) @()).Mode
+    Assert-Equal 'Composite Scanner API (tables)' ((Get-A2CPbiModelAccessMode 'm4' ([pscustomobject]@{ tables = @(@{ storageMode = 'Import' }, @{ storageMode = 'DirectQuery' }) }) $null @()) | ForEach-Object { $_.Mode + ' ' + $_.Source })
+    Assert-Equal 'LiveConnection' (Get-A2CPbiModelAccessMode 'm5' $null $null @('AnalysisServices')).Mode
+    Assert-Equal '3 10 20 10' ('{0} {1} {2} {3}' -f (Get-A2CPbiBatchSize 'F8'), (Get-A2CPbiBatchSize 'P1'), (Get-A2CPbiBatchSize 'F128'), (Get-A2CPbiBatchSize ''))
 }
 Test-Case 'item dependencies and external targets in one place' {
     $d = Import-TWCsv $run 'PowerBI/itemDependencies.csv'
@@ -288,7 +324,7 @@ Test-Case 'admin report is skipped with the reason and writes no admin files' {
 Test-Case 'findings' {
     $f = Import-TWCsv $run 'findings.csv'
     $ids = ($f | ForEach-Object { $_.Id } | Sort-Object) -join ' '
-    Assert-Equal 'PBI-01 PBI-02 PBI-03 PBI-04 PBI-05 PBI-06 PBI-10 PBI-12 PBI-13' $ids
+    Assert-Equal 'PBI-01 PBI-02 PBI-03 PBI-04 PBI-05 PBI-06 PBI-10 PBI-12 PBI-13 PBI-23' $ids
     Assert-Match ($f | Where-Object { $_.Id -eq 'PBI-01' }).Detail 'Sales / Sales model'
     Assert-Match ($f | Where-Object { $_.Id -eq 'PBI-05' }).Detail 'gone@contoso.com'
     Assert-Match ($f | Where-Object { $_.Id -eq 'PBI-06' }).Detail 'Finance DEV'
@@ -550,6 +586,38 @@ Test-Case 'usage estimate: active users per workspace and capacity, capacity foo
     $f = (Import-TWCsv $run 'findings.csv') | Where-Object { $_.Id -eq 'PBI-19' }
     Assert-Equal '1 personal workspaces, 1 of them empty (100%), 0 with content; 4 users and 1 guests have a role somewhere' $f.Detail
 }
+Test-Case 'migration handling: model access mode and refresh identity tenant-wide, real gateways, migration class, batches, connection targets' {
+    $m = Import-TWCsv $run 'PowerBI/modelMigration.csv'
+    Assert-Equal 'd1 d2 d9' (($m | ForEach-Object { $_.ModelId } | Sort-Object) -join ' ') 'member models and admin-only models in one file'
+    $d9 = $m | Where-Object { $_.ModelId -eq 'd9' }
+    Assert-Equal 'Import Content provider type Cloud Personal cloud connection (OAuth2) Yes Re-authenticate (personal credential)' ('{0} {1} {2} {3} {4} {5}' -f $d9.AccessMode, $d9.ModeSource,
+        $d9.GatewayType, $d9.RefreshIdentity, $d9.PersonalCredential, $d9.HandlingClass)
+    Assert-Match $d9.Note 'no refresh history: the account has no role in the workspace'
+    $cov = Get-TWCoverage $run 'Refresh history as administrator'
+    Assert-Equal 'Partial' $cov['Status']
+    Assert-Match $cov['Detail'] '^0 model\(s\) in 1 workspace\(s\) outside the PowerBI report; 1 workspace\(s\) refused' 'Sales was read by the PowerBI report; Legacy reports refused'
+    $w = Import-TWCsv $run 'PowerBI/adminWorkspaces.csv'
+    $got = ($w | Sort-Object Workspace | ForEach-Object { '{0}={1}' -f $_.Workspace, $_.MigrationClass }) -join ' | '
+    Assert-Equal 'Legacy reports=D Deprioritize | Old project=D Deprioritize | Orphaned=D Deprioritize | PersonalWorkspace Bob=D Deprioritize | Sales=C Manual' $got
+    Assert-Match ($w | Where-Object { $_.Workspace -eq 'Legacy reports' }).MigrationReason '^stale: no change since 2024-03-01'
+    $map = Import-TWCsv $run 'PowerBI/repointingMap.csv'
+    Assert-Equal 'Cloud False | OnPremises True' (($map | Sort-Object Workspace | ForEach-Object { $_.GatewayType + ' ' + $_.UsesGateway }) -join ' | ') 'a cloud gateway ID is no gateway'
+    $c = Import-TWCsv $run 'PowerBI/capacityFootprint.csv' | Where-Object { $_.Capacity -eq 'cap-prod' }
+    Assert-Equal '1 10 1' ('{0} {1} {2}' -f $c.ToMigrate, $c.BatchSize, $c.Batches)
+    $rf = Import-TWCsv $run 'PowerBI/refreshables.csv'
+    Assert-Equal 'd1 7 Fabric admin' ('{0} {1} {2}' -f $rf[0].Id, $rf[0].RefreshCount, $rf[0].Source) 'the admin refreshables are written, not only used'
+    $t = Import-TWCsv $run 'PowerBI/targetConnections.csv'
+    $sp = $t | Where-Object { $_.DatasourceType -eq 'SharePointList' }
+    Assert-Equal 'Cloud contoso.sharepoint.com 1 OAuth2 1' ('{0} {1} {2} {3} {4}' -f $sp.Connectivity, $sp.Hosts, $sp.Models, $sp.CredentialTypes, $sp.PersonalBindings)
+    $sum = @{}; foreach ($r in (Import-TWCsv $run 'PowerBI/workspaceScopeSummary.csv')) { $sum[$r.Measure] = $r.Count }
+    $want = [ordered]@{ 'Migration class A Scriptable copy' = '0'; 'Migration class C Manual' = '1'; 'Migration class D Deprioritize' = '4'; 'Semantic models' = '3'
+        'Semantic models: Composite' = '1'; 'Semantic models through an on-premises gateway' = '1'; 'Semantic models with a personal credential' = '1'
+        'Connection targets to create in the target tenant' = '4' }
+    foreach ($k in $want.Keys) { Assert-Equal $want[$k] $sum[$k] $k }
+    $f = Import-TWCsv $run 'findings.csv'
+    Assert-Equal '1 Legacy reports (1)' (($f | Where-Object { $_.Id -eq 'PBI-22' }) | ForEach-Object { $_.Count + ' ' + $_.Detail })
+    Assert-Equal '1 D Deprioritize (4), C Manual (1)' (($f | Where-Object { $_.Id -eq 'PBI-24' }) | ForEach-Object { $_.Count + ' ' + $_.Detail })
+}
 
 Write-Host 'Share-safe scope run (-ClientScope)' -ForegroundColor Cyan
 Test-Case '-ClientScope: admin APIs only, the share-safe files only, nothing sensitive in the output' {
@@ -562,8 +630,8 @@ Test-Case '-ClientScope: admin APIs only, the share-safe files only, nothing sen
     Assert-Equal 0 $r.Errors.Count ($r.Errors -join ' | ')
     Assert-Equal 'PowerBIAdmin,PowerBIActivity,Principals' ($r.Selected -join ',') 'other reports are ignored'
     $files = (Get-ChildItem -LiteralPath (Join-Path $r.OutDir 'PowerBI') -Recurse -File | ForEach-Object { $_.Name } | Sort-Object) -join ', '
-    Assert-Equal ('adminCapacities.csv, adminDatasourceInstances.csv, adminWorkspaces.csv, capacityFootprint.csv, principals.csv, repointingMap.csv, workspacePlan.csv, ' +
-        'workspaceScopeSummary.csv') $files
+    Assert-Equal ('adminCapacities.csv, adminDatasourceInstances.csv, adminWorkspaces.csv, capacityFootprint.csv, modelMigration.csv, principals.csv, repointingMap.csv, ' +
+        'targetConnections.csv, workspacePlan.csv, workspaceScopeSummary.csv') $files
     Assert-True (Test-Path -LiteralPath (Join-Path $global:TWOut ($r.RunName + '.zip'))) 'zip is on'
     $reqs = @($global:TWRequests | ForEach-Object { $_.Uri })
     Assert-Equal 0 @($reqs | Where-Object { $_ -match 'tenantsettings|/admin/apps|widelyShared|/admin/domains' }).Count 'no settings, apps or sharing links'
@@ -593,7 +661,14 @@ Test-Case '-ClientScope: admin APIs only, the share-safe files only, nothing sen
     Assert-Equal '4 1 2 1 not available from the admin APIs' ('{0} {1} {2} {3} {4}' -f $sum['On the workspace list'], $sum['On the list, not found in the tenant'], $sum['On the list, but empty, personal or not active'],
         $sum['Shared with content, not on the list'], ((Import-TWCsv $r 'PowerBI/workspaceScopeSummary.csv') | Where-Object { $_.Measure -eq 'Shared with content, connected to Git' }).Note)
     $ids = ((Import-TWCsv $r 'findings.csv') | ForEach-Object { $_.Id } | Sort-Object) -join ' '
-    Assert-Equal 'PBI-11 PBI-15 PBI-16 PBI-17 PBI-18 PBI-19 PBI-20 PBI-21' $ids
+    Assert-Equal 'PBI-11 PBI-15 PBI-16 PBI-17 PBI-18 PBI-19 PBI-20 PBI-21 PBI-24' $ids
+    $mm = Import-TWCsv $r 'PowerBI/modelMigration.csv'
+    Assert-Equal 0 @($mm | Where-Object { $_.Model -or $_.ConfiguredBy }).Count 'no model names, no people'
+    $d1 = $mm | Where-Object { $_.ModelId -eq 'd1' }
+    Assert-Equal 'Import Content provider type OnPremises (not visible) Re-point (gateway) Capacity refreshables' ('{0} {1} {2} {3} {4}' -f $d1.AccessMode, $d1.ModeSource, $d1.GatewayType, $d1.HandlingClass, $d1.RefreshSource)
+    Assert-Equal 'Unknown' ($mm | Where-Object { $_.ModelId -eq 'd9' }).PersonalCredential 'the connection is not visible without the Fabric report'
+    Assert-Equal 'B Re-point' (Import-TWCsv $r 'PowerBI/adminWorkspaces.csv' | Where-Object { $_.Workspace -eq 'Sales' }).MigrationClass
+    Assert-Equal 0 @($global:TWRequests | Where-Object { $_.Uri -match '/refreshes' }).Count 'no refresh history in the share-safe run'
 }
 Test-Case '-ClientScope without the administrator role: a clear skip, no error, no scope files' {
     $r = Invoke-TWRun -Params @{ ClientScope = $true }

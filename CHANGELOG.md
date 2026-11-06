@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.2.0 - 2026-11-06
+
+How each model and workspace moves: access mode, real gateways, refresh identity and health per model, the
+connections the target tenant needs, and a migration class per workspace. 12 reports, up to 97 CSV files, 24 findings.
+
+### Migration handling (`PowerBI`, `PowerBIAdmin`)
+- `modelMigration.csv`: one row per semantic model, from the workspaces the account is a member of and, as a Fabric
+  administrator, the whole tenant. `AccessMode` (Import, DirectLake, DirectQuery, Composite, LiveConnection, Push,
+  Unknown) with `IsComposite`, `DirectQueryToModel` and where it came from (definition, Scanner tables, admin content
+  type, data sources); gateway type; refresh identity (gateway, shared cloud or personal cloud connection) with
+  credential types, `PersonalCredential` and `StoredPassword`; refresh health (last status, refreshes, failures,
+  failure rate); `HandlingClass`.
+- `targetConnections.csv`: the distinct connection targets per connectivity (on-premises gateway, VNet gateway, cloud,
+  Fabric) and data source type, with hosts, models, items, workspaces and credential types: the checklist for the
+  target tenant's admin.
+- `adminWorkspaces.csv` `MigrationClass` and `MigrationReason`: A scriptable copy, B re-point, C manual, D deprioritize;
+  counted in `workspaceScopeSummary.csv` with the models per access mode, models through an on-premises gateway, models
+  with a personal credential and connection targets.
+- `capacityFootprint.csv` `ToMigrate`, `BatchSize`, `Batches`: workspaces per migration batch, a rule of thumb from
+  the capacity size.
+- `semanticModels.csv` `AccessMode` and `IsComposite`; `GatewayType` in the data source files of models, reports and
+  dataflows.
+- As an administrator: `/admin/datasets` for every model's on-premises gateway, refreshable and content type flags,
+  and the refresh history of models outside the member workspaces where the account has a role (one refused call per
+  workspace without one).
+- Findings PBI-22 (models that refresh with a personal credential), PBI-23 (composite, live connection and push
+  models), PBI-24 (migration class per workspace).
+
+### Fixed
+- `UsesGateway` in `adminWorkspaces.csv` and `repointingMap.csv` was true for every data source with a gateway ID,
+  also for cloud connections, which carry the ID of a cloud gateway cluster. It now means an on-premises or VNet
+  gateway (`GatewayType` says which).
+- `refreshables.csv` stayed empty for a Fabric administrator: the tenant-wide refresh statistics of every dedicated
+  capacity were read but only used for the re-pointing map. They are written now (`Source` column).
+- `modelPartitions.csv` `Mode` and `semanticModels.csv` `StorageModes`: a partition without a mode now gets the
+  model's default mode (`defaultMode`, import when absent) instead of an empty value or its source type (`query`).
+
 ## 1.1.0 - 2026-11-05
 
 Migration scope for administrators, a share-safe run for a customer's administrator, and the principals behind every

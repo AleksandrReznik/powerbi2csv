@@ -1,1 +1,2 @@
-﻿"Capacity","CapacityId","Workspace","WorkspaceId","Name","Id","Kind","RefreshCount","RefreshFailures","AverageDurationSec","MedianDurationSec","RefreshesPerDay","LastRefreshStatus","LastRefreshStart","LastRefreshEnd","ScheduleEnabled","ScheduleDays","ScheduleTimes"
+﻿"Capacity","CapacityId","Workspace","WorkspaceId","Name","Id","Kind","RefreshCount","RefreshFailures","AverageDurationSec","MedianDurationSec","RefreshesPerDay","LastRefreshStatus","LastRefreshStart","LastRefreshEnd","ScheduleEnabled","ScheduleDays","ScheduleTimes","Source"
+"cap-prod","cccccccc-0000-0000-0000-000000000001","Sales","aaaaaaaa-0000-0000-0000-000000000001","Sales model","d1","Dataset","7","","120","","1","","","","True","Monday","05:00","Fabric admin"

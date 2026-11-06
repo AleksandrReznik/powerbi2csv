@@ -53,9 +53,9 @@ function New-TWWorld {
     $pbi.Add((New-TWRoute GET "^/groups/$w1/reports/r1/Export$" { @{ StatusCode = 200; Content = ''; Headers = @{}; File = 'PBIX-BYTES' } }))
     $pbi.Add((New-TWRoute GET "^/groups/$w1/reports/r2/Export$" { New-TWError 400 'ExportNotSupported' 'Report cannot be exported' }))
     $pbi.Add((New-TWRoute GET "^/groups/$w1/datasets$" { New-TWList @(
-                    @{ id = 'd1'; name = 'Sales model'; configuredBy = 'gone@contoso.com'; isRefreshable = $true; targetStorageMode = 'Abf'; createdDate = '2025-01-02T03:04:05Z' },
+                    @{ id = 'd1'; name = 'Sales model'; configuredBy = 'gone@contoso.com'; isRefreshable = $true; isOnPremGatewayRequired = $true; targetStorageMode = 'Abf'; createdDate = '2025-01-02T03:04:05Z' },
                     @{ id = 'd2'; name = 'Unused model'; configuredBy = 'anna@contoso.com'; isRefreshable = $false; targetStorageMode = 'Abf' }) }))
-    $pbi.Add((New-TWRoute GET "^/groups/$w1/datasets/d1/datasources$" { New-TWList @(@{ datasourceType = 'Sql'; connectionDetails = @{ server = 'sql1.contoso.com'; database = 'Sales' }; datasourceId = 'ds1'; gatewayId = 'gw1' }) }))
+    $pbi.Add((New-TWRoute GET "^/groups/$w1/datasets/d1/datasources$" { New-TWList @(@{ datasourceType = 'Sql'; connectionDetails = @{ server = 'sql1.contoso.com'; database = 'Sales' }; datasourceId = 'c1'; gatewayId = 'gw1' }) }))
     $pbi.Add((New-TWRoute GET "^/groups/$w1/datasets/d2/datasources$" { New-TWList @() }))
     $pbi.Add((New-TWRoute GET "^/groups/$w1/datasets/d1/users$" { New-TWError 403 'Forbidden' 'Not the owner' }))
     $pbi.Add((New-TWRoute GET "^/groups/$w1/datasets/d2/users$" { New-TWList @(@{ identifier = 'anna@contoso.com'; principalType = 'User'; datasetUserAccessRight = 'ReadWriteReshareExplore' }) }))
@@ -109,6 +109,11 @@ function New-TWWorld {
                     @{ id = 'aaaaaaaa-0000-0000-0000-00000000000c'; name = 'Old project'; type = 'Workspace'; state = 'Deleted'; users = @() }) }))
     $pbi.Add((New-TWRoute GET '^/admin/capacities/refreshables\?' { New-TWList @(@{ id = 'd1'; name = 'Sales model'; kind = 'Dataset'; refreshCount = 7; refreshesPerDay = 1; averageDuration = 120
                         refreshSchedule = @{ days = @('Monday'); times = @('05:00'); enabled = $true }; capacity = @{ id = $global:TWCap; displayName = 'cap-prod' }; group = @{ id = $global:TWW1; name = 'Sales' } }) }))
+    # every model of the tenant: d1 needs an on-premises gateway; the account has no role in 'Legacy reports' (refresh history refused)
+    $pbi.Add((New-TWRoute GET '^/admin/datasets\?' { New-TWList @(
+                    @{ id = 'd1'; name = 'Sales model'; workspaceId = $global:TWW1; configuredBy = 'gone@contoso.com'; isRefreshable = $true; isOnPremGatewayRequired = $true; contentProviderType = 'PbixInImportMode' },
+                    @{ id = 'd9'; name = 'Old model'; workspaceId = 'aaaaaaaa-0000-0000-0000-00000000000b'; isRefreshable = $true; isOnPremGatewayRequired = $false; contentProviderType = 'PbixInImportMode' }) }))
+    $pbi.Add((New-TWRoute GET '^/groups/aaaaaaaa-0000-0000-0000-00000000000b/datasets/d9/refreshes\?' { New-TWError 401 'PowerBINotAuthorizedException' 'Unauthorized' }))
     $pbi.Add((New-TWRoute GET '^/admin/workspaces/modified\?modifiedSince=' { , @(@{ id = $global:TWW1 }) }))
     $pbi.Add((New-TWRoute GET '^/admin/workspaces/modified\?' { , @(@{ id = $global:TWW1 }, @{ id = 'aaaaaaaa-0000-0000-0000-000000000009' }, @{ id = 'aaaaaaaa-0000-0000-0000-00000000000a' },
                     @{ id = 'aaaaaaaa-0000-0000-0000-00000000000b' }) }))
@@ -128,7 +133,7 @@ function New-TWWorld {
                             reports = @(@{ id = 'r9'; name = 'Old KPI'; datasetId = 'd9'; modifiedDateTime = '2024-03-01T00:00:00Z' })
                             datasets = @(@{ id = 'd9'; name = 'Old model'; createdDate = '2023-05-01T00:00:00Z'; datasourceUsages = @(@{ datasourceInstanceId = 'dsi2' }) }) })
                     datasourceInstances = @(@{ datasourceId = 'dsi1'; datasourceType = 'Sql'; connectionDetails = @{ server = 'sql1.contoso.com'; database = 'Sales' }; gatewayId = 'gw1' },
-                        @{ datasourceId = 'dsi2'; datasourceType = 'SharePointList'; connectionDetails = @{ url = 'https://contoso.sharepoint.com/sites/Old' } }) } }))
+                        @{ datasourceId = 'dsi2'; datasourceType = 'SharePointList'; connectionDetails = @{ url = 'https://contoso.sharepoint.com/sites/Old' }; gatewayId = 'cgw1' }) } }))
     $pbi.Add((New-TWRoute GET '^/admin/apps\?' { New-TWList @(@{ id = 'app1'; name = 'Sales app'; workspaceId = $global:TWW1 }) }))
     $pbi.Add((New-TWRoute GET '^/admin/widelySharedArtifacts/publishedToWeb$' { @{ ArtifactAccessEntities = @(@{ artifactId = 'r1'; displayName = 'Sales overview'; artifactType = 'Report'; shareType = 'PublishToWeb'; sharer = @{ emailAddress = 'anna@contoso.com'; principalType = 'User' } }) } }))
     $pbi.Add((New-TWRoute GET '^/admin/widelySharedArtifacts/linksSharedToWholeOrganization$' { @{ ArtifactAccessEntities = @() } }))
@@ -186,7 +191,9 @@ function New-TWWorld {
                             @{ path = '../.platform'; payload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('{}')); payloadType = 'InlineBase64' }) } } }))
     $fab.Add((New-TWRoute POST "^/workspaces/$w1/items/\w+/getDefinition$" { New-TWResponse -Obj @{ errorCode = 'OperationNotSupportedForItem'; message = 'Not supported' } -Status 400 }))
     $fab.Add((New-TWRoute GET '^/connections$' { New-TWList @(@{ id = 'c1'; displayName = 'sql1 Sales'; connectivityType = 'OnPremisesGateway'; gatewayId = 'gw1'; privacyLevel = 'Organizational'
-                        connectionDetails = @{ type = 'SQL'; path = 'sql1.contoso.com;Sales' }; credentialDetails = @{ credentialType = 'Basic'; singleSignOnType = 'None'; connectionEncryption = 'Encrypted'; skipTestConnection = $false } }) }))
+                        connectionDetails = @{ type = 'SQL'; path = 'sql1.contoso.com;Sales' }; credentialDetails = @{ credentialType = 'Basic'; singleSignOnType = 'None'; connectionEncryption = 'Encrypted'; skipTestConnection = $false } },
+                    @{ id = 'dsi2'; displayName = 'Old site'; connectivityType = 'PersonalCloud'; gatewayId = 'cgw1'; privacyLevel = 'Organizational'
+                        connectionDetails = @{ type = 'SharePoint'; path = 'https://contoso.sharepoint.com/sites/Old' }; credentialDetails = @{ credentialType = 'OAuth2' } }) }))
     $fab.Add((New-TWRoute GET '^/gateways$' { New-TWList @(@{ id = 'gw1'; displayName = 'onprem-gw'; type = 'OnPremises'; version = '3000.1'; numberOfMemberGateways = 2 }) }))
     $fab.Add((New-TWRoute GET '^/capacities$' { New-TWList @(@{ id = $global:TWCap; displayName = 'cap-prod'; sku = 'F64'; region = 'West Europe'; state = 'Active' },
                     @{ id = 'cccccccc-0000-0000-0000-000000000002'; displayName = 'cap-test'; sku = 'F2'; region = 'North Europe'; state = 'Inactive' }) }))

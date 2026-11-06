@@ -44,11 +44,11 @@ A folder `powerbi2csv_<yyyyMMdd-HHmmss>_<tenant>` with:
 
 | Report | Profile | Needs | Files in `PowerBI\` |
 |---|---|---|---|
-| `PowerBI` | Standard | workspace member | `workspaces`, `workspaceUsers`, `reports`, `reportPages`, `reportDatasources`, `semanticModels`, `semanticModelDatasources`, `semanticModelUsers`, `semanticModelParameters`, `refreshSchedules`, `refreshHistory`, `dashboards`, `dashboardTiles`, `dataflows`, `dataflowDatasources`, `dataflowTransactions`, `lineage`, `apps`, `appContent`, `capacities`, `capacityWorkloads`, `refreshables`, `gateways`, `gatewayDatasources`, `gatewayDatasourceUsers`, `deploymentPipelines`, `pipelineStages`, `pipelineStageItems`, `pipelineUsers`, `pipelineOperations`, `availableFeatures` |
+| `PowerBI` | Standard | workspace member | `workspaces`, `workspaceUsers`, `reports`, `reportPages`, `reportDatasources`, `semanticModels`, `semanticModelDatasources`, `semanticModelUsers`, `semanticModelParameters`, `refreshSchedules`, `refreshHistory`, `dashboards`, `dashboardTiles`, `dataflows`, `dataflowDatasources`, `dataflowTransactions`, `lineage`, `apps`, `appContent`, `capacities`, `capacityWorkloads`, `refreshables`, `gateways`, `gatewayDatasources`, `gatewayDatasourceUsers`, `deploymentPipelines`, `pipelineStages`, `pipelineStageItems`, `pipelineUsers`, `pipelineOperations`, `availableFeatures`, `modelMigration` (one row per model: access mode, gateway, who it refreshes as, refresh health, how it moves), `targetConnections` (the connections the target tenant needs, per connectivity and type) |
 | `Fabric` | Quick, Standard | workspace member | `workspaces`, `fabricItems` (every item type, with folder path, tags, logical ID, last run), `folders`, `workspaceRoleAssignments`, `onelakeRoles` (OneLake security roles of lakehouses), `workspaceGit` (connection and number of uncommitted / incoming items), `gitItemStatus`, `workspaceNetwork` (inbound / outbound policy), `workspaceSparkSettings`, `sparkPools`, `sparkSessions` (latest 200 per workspace), `managedPrivateEndpoints`, `lakehouses`, `lakehouseTables`, `warehouses`, `shortcuts` (target connection, location, subpath), `itemSchedules`, `itemRuns` (run history of pipelines and notebooks), `itemConnections`, `connections`, `deploymentStages`, `deploymentStageItems`, `deploymentRoleAssignments` (deployment pipelines with every item type), `domains`, `environmentMatrix` (the same solution in DEV / TEST / UAT / PROD side by side), `capacities`, `gateways` |
 | `FabricSql` | Standard | read on the lakehouse / warehouse, outbound TCP 1433 | `sqlObjects` (tables, views, procedures, functions), `sqlColumns`, `sqlModules` (code of views and procedures), `sqlReferences` (references to other databases). Also fills the counts in `warehouses` and `lakehouses` and the tables of lakehouses with schemas in `lakehouseTables` |
-| `Dependencies` | Standard | Contributor (item definitions) | `pipelineActivities` (what each pipeline runs: notebooks, dataflows, procedures with parameters, model refreshes), `notebookDependencies` (attached lakehouses, tables read and written, OneLake paths, notebooks called, URLs), `dataflowSources` (SharePoint site and file, SQL, destination lakehouse), `modelPartitions` (import / Direct Lake / DirectQuery per table), `modelExpressions` (DAX of measures and calculated columns, M queries), `modelRoles` (row-level security), `modelSources`, `itemDependencies` (every item-to-item link in one file), `externalDependencies` (every SharePoint site, SQL server, storage account, URL and who uses it) |
-| `PowerBIAdmin` | Standard | Fabric administrator | `adminWorkspaces` (whole tenant, also personal and orphaned; per workspace the scope - personal or shared, with content or empty, not active -, item count, last change seen, changed in the last 30 days, active users, admins, departed admins and a NoAdmin flag, data source types and gateway use), `workspaceScopeSummary` (the tenant's migration scope on one page), `repointingMap` (per workspace, also those the account cannot open: every data source host, gateway, the items and models using it and their refresh schedules), `capacityFootprint` (estimate per capacity: workspaces, items, refreshes, active users), `adminWorkspaceUsers`, `adminItems`, `adminItemUsers`, `adminDatasourceInstances`, `adminModelTables`, `adminModelExpressions`, `tenantSettings`, `adminCapacities`, `adminApps`, `widelyShared`, `adminDomains`, `scan\scanResult_*.json` (complete Scanner API answer) |
+| `Dependencies` | Standard | Contributor (item definitions) | `pipelineActivities` (what each pipeline runs: notebooks, dataflows, procedures with parameters, model refreshes), `notebookDependencies` (attached lakehouses, tables read and written, OneLake paths, notebooks called, URLs), `dataflowSources` (SharePoint site and file, SQL, destination lakehouse), `modelPartitions` (import / Direct Lake / DirectQuery per table; a partition without a mode gets the model's default), `modelExpressions` (DAX of measures and calculated columns, M queries), `modelRoles` (row-level security), `modelSources`, `itemDependencies` (every item-to-item link in one file), `externalDependencies` (every SharePoint site, SQL server, storage account, URL and who uses it) |
+| `PowerBIAdmin` | Standard | Fabric administrator | `adminWorkspaces` (whole tenant, also personal and orphaned; per workspace the scope - personal or shared, with content or empty, not active -, the migration class A to D with the reason, item count, last change seen, changed in the last 30 days, active users, admins, departed admins and a NoAdmin flag, data source types and gateway use), `workspaceScopeSummary` (the tenant's migration scope on one page), `repointingMap` (per workspace, also those the account cannot open: every data source host, gateway, the items and models using it and their refresh schedules), `capacityFootprint` (estimate per capacity: workspaces, items, refreshes, active users, migration batches), `modelMigration` and `targetConnections` for every model of the tenant, `refreshables` (every dedicated capacity), `adminWorkspaceUsers`, `adminItems`, `adminItemUsers`, `adminDatasourceInstances`, `adminModelTables`, `adminModelExpressions`, `tenantSettings`, `adminCapacities`, `adminApps`, `widelyShared`, `adminDomains`, `scan\scanResult_*.json` (complete Scanner API answer) |
 | `FabricCode` * | Full, Migration | Contributor (item definitions) | the code as files: `<workspace>\Notebook\<notebook>\notebook-content.py`, `<workspace>\DataPipeline\<pipeline>\pipeline-content.json`, `<workspace>\Dataflow\<dataflow>\mashup.pq`, `<workspace>\SemanticModel\<model>\definition\*.tmdl`, every other item type that has a definition, `<workspace>\dataflows\*.json` (gen1), `<workspace>\sql\<database>\*.sql` (with `FabricSql`), and `exportIndex`. No report files, no data |
 | `FabricStorage` * | Full, Migration | read on the lakehouse / warehouse | `onelakeStorage` (size per lakehouse and warehouse), `onelakeTableSizes` (files and bytes per table) |
 | `PowerAutomate` * | Full, Migration | flow owner; Power Platform administrator for all flows | `flowEnvironments`, `flows` (triggers, connectors, whether a flow uses Power BI) |
@@ -86,6 +86,8 @@ admin APIs are called, and only what a migration scope needs is collected:
   change seen, active users, data source types, gateway yes/no), `adminCapacities.csv`, `adminDatasourceInstances.csv`
   (type and gateway only), `repointingMap.csv` (type and **host name** per workspace and data source, gateway, number
   of items and models, refresh schedules; no database, path, file or item names), `capacityFootprint.csv`,
+  `modelMigration.csv` (per model: access mode, gateway, refresh identity, handling class; no model names, no owners),
+  `targetConnections.csv` (connection targets per type with host names),
   `principals.csv` (groups, service principals, managed identities and workspace or capacity admins by name; all other
   people only as counts in the summary), `workspaceScopeSummary.csv`, `workspacePlan.csv` (with `-WorkspaceListFile`),
   `findings.csv`, `coverage.csv`, the log and a zip.
@@ -106,6 +108,38 @@ the shared ones with content how many are on a capacity, use a gateway, have no 
 how many data source hosts they reference, how many users, guests, groups, apps and departed accounts have access,
 how many users were active, and (with a workspace list) how many are not on it. Finding `PBI-19` explains the number
 of personal workspaces in one sentence: Power BI creates one for every user who opens it, and most stay empty.
+
+### How each model and workspace moves
+
+With the `PowerBI` report (workspaces the account is a member of) and, as a Fabric administrator, `PowerBIAdmin`
+(every model of the tenant), three files turn the inventory into a plan:
+
+- `modelMigration.csv`, one row per semantic model:
+  - `AccessMode`: Import, DirectLake, DirectQuery, Composite (mixed storage modes, or DirectQuery over another
+    semantic model: `DirectQueryToModel`), LiveConnection, Push or Unknown. `ModeSource` says where it came from: the
+    model definition (`Dependencies`), the table storage modes of the Scanner API, the admin API's content type, or
+    the data sources.
+  - `GatewayType` and `OnPremGateway`: OnPremises, VirtualNetwork or Cloud. A gateway ID alone is not a gateway: cloud
+    connections carry the ID of a cloud gateway cluster too, so the type comes from the gateway and connection lists
+    and from the model's own `isOnPremGatewayRequired` flag.
+  - `RefreshIdentity`, `CredentialTypes`, `PersonalCredential` and `StoredPassword`: the connection each data source is
+    bound to (gateway, shared cloud, personal cloud) and its credential type. A personal cloud connection, a personal
+    gateway or an OAuth2 token means a personal credential; `Unknown` when the connection is not visible to the account.
+  - Refresh health: last status and end, refreshes, failures and failure rate, from the model's refresh history or
+    the statistics of a dedicated capacity (`RefreshSource`).
+  - `HandlingClass`: Scriptable copy, Re-point (gateway), Re-authenticate (personal credential), Manual (composite /
+    live / push), or Check (mode not known).
+- `targetConnections.csv`: what the target tenant's admin creates before the first refresh, as a checklist: the
+  distinct data source targets per connectivity (on-premises gateway, VNet gateway, cloud, Fabric in this tenant) and
+  type, with hosts, number of models, items and workspaces, credential types and personal bindings.
+- `adminWorkspaces.csv` `MigrationClass`, per workspace, the first that applies: **D** Deprioritize (not active,
+  personal, empty, or stale: no change in 180 days and no activity), **C** Manual (a composite, live or push model),
+  **B** Re-point (a model through a gateway or with a personal credential), **A** Scriptable copy. `MigrationReason`
+  says why; `workspaceScopeSummary.csv` counts them, and `capacityFootprint.csv` suggests how many workspaces to move
+  at once per capacity (`BatchSize`, `Batches`: a rule of thumb from the capacity size).
+
+Findings `PBI-22` (personal credentials), `PBI-23` (composite, live and push models) and `PBI-24` (the classes) sum
+it up.
 
 ### Checking against a list of expected workspaces
 
@@ -169,7 +203,15 @@ Known gaps:
 - `repointingMap` has refresh schedules for models on a dedicated capacity only: the admin API for schedules covers
   capacities, and there is no tenant-wide schedule API for shared capacity (`ScheduleKnown` says which).
 - `capacityFootprint` is an estimate from counts, refresh statistics and the activity log. Capacity consumption (CU)
-  has no API.
+  has no API, so `BatchSize` is a rule of thumb (3 workspaces at a time up to F8, 5 up to F32, 10 up to F64 and on
+  shared capacity, 20 above): check the Capacity Metrics app after the first batch.
+- There is no admin API for refresh history. As an administrator, the script asks the workspace API for the models
+  outside the workspaces the `PowerBI` report read; the first refused call skips the rest of that workspace, so a
+  workspace without a role costs one call. Elsewhere refresh health comes from the capacity statistics (dedicated
+  capacities only), and `modelMigration.csv` says why it is empty.
+- `PersonalCredential` = `Unknown` means the data source's connection is not visible to the account: Fabric lists
+  only the connections the account may use, so another person's personal cloud connection and a shared connection
+  without access look the same.
 - The admin parts were built and tested against a fake tenant only: the account this was developed with is not a
   Fabric administrator. Run them on a few workspaces first and check `coverage.csv`.
 - Not read: capacity usage (the Capacity Metrics data has no REST API), tenant-wide tags and sensitivity labels

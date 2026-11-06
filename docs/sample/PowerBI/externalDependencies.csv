@@ -1,6 +1,7 @@
 ﻿"Kind","Scope","Target","Detail","Workspace","UsedByType","UsedBy","UsedById","Via"
 "Azure Storage","External","https://stor.dfs.core.windows.net","/raw","Sales","Lakehouse","Bronze","lh1","shortcut"
 "SharePoint","External","https://contoso.sharepoint.com/sites/Finance","https://contoso.sharepoint.com/sites/Finance/Shared Documents/ | Budget.xlsx","Sales","Dataflow","Import files","bbbbbbbb-0000-0000-0000-000000000003","dataflow query Budget"
+"SharePoint","External","https://contoso.sharepoint.com/sites/Old","PersonalCloud","","Connection","Old site","dsi2","connection"
 "SQL","External","sql1.contoso.com","Invoices","Sales","Report","Invoice: print/layout","r2","data source SQL"
 "SQL","External","sql1.contoso.com","Sales","Sales","SemanticModel","Sales model","d1","data source Sql"
 "SQL","External","sql1.contoso.com;Sales","OnPremisesGateway","","Connection","sql1 Sales","c1","connection"

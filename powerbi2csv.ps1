@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 1.1.0
+.VERSION 1.2.0
 .GUID 6f0b1c0e-6a55-4f6b-9a0b-0d0c6f3d7e21
 .AUTHOR Aleksandr Reznik
 .COMPANYNAME it4it.solutions
@@ -9,6 +9,8 @@
 .PROJECTURI https://github.com/AleksandrReznik/powerbi2csv
 .EXTERNALMODULEDEPENDENCIES Az.Accounts
 .RELEASENOTES
+1.2.0 Migration handling: access mode, real gateways, refresh identity and health per model, connection targets,
+migration class per workspace, findings PBI-22 to PBI-24: 12 reports, up to 97 CSV files, 24 findings.
 1.1.0 Migration scope for administrators, share-safe -ClientScope run, principals, re-pointing map,
 usage estimate, findings PBI-15 to PBI-21: 12 reports, up to 95 CSV files, 21 findings.
 1.0.0 First public release: 11 reports, up to 90 CSV files, 14 findings. Same structure and helpers as azure2csv.ps1
@@ -58,7 +60,7 @@ Share-safe scope run for a Fabric administrator of a customer tenant: only the a
 only what a migration scope needs. Writes adminWorkspaces.csv (type, state, capacity, number of users, workspace
 admins, item counts, last change seen, active users, data source types, gateway use), adminCapacities.csv,
 adminDatasourceInstances.csv without addresses, repointingMap.csv with host names only, capacityFootprint.csv,
-principals.csv (groups, apps and admins named, other people as counts), workspaceScopeSummary.csv, workspacePlan.csv
+modelMigration.csv and targetConnections.csv without model names or owners, principals.csv (groups, apps and admins named, other people as counts), workspaceScopeSummary.csv, workspacePlan.csv
 (with -WorkspaceListFile), findings and coverage. The activity log is counted, not written. Does not collect DAX, M,
 model schemas, code, per-item users, item names, database names or paths, tenant settings or sharing links, and
 writes no raw Scanner API answer. -Reports, -AddReports, -SkipReports and -ReportProfile are ignored; -Zip is on.
@@ -233,7 +235,7 @@ Set-StrictMode -Version 1.0
 
 #region ============================== 1. CONSTANTS AND CATALOGS ======================================
 
-$script:A2CVersion = '1.1.0'
+$script:A2CVersion = '1.2.0'
 $script:A2CBrand = [ordered]@{
     Tool    = 'powerbi2csv'
     Author  = 'Aleksandr Reznik'
@@ -249,7 +251,7 @@ $script:A2CBrand = [ordered]@{
 $script:A2CReportCatalog = @(
     # ---- Power BI ----
     @{ Name = 'PowerBI';         Group = 'Analytics'; Speed = 'Slow';   OptIn = $false; Perm = 'Workspace member (more with Contributor/Admin)'
-       Files = 'PowerBI\workspaces.csv, workspaceUsers.csv, reports.csv, reportPages.csv, reportDatasources.csv, semanticModels.csv, semanticModelDatasources.csv, semanticModelUsers.csv, semanticModelParameters.csv, refreshSchedules.csv, refreshHistory.csv, dashboards.csv, dashboardTiles.csv, dataflows.csv, dataflowDatasources.csv, dataflowTransactions.csv, lineage.csv, apps.csv, appContent.csv, capacities.csv, capacityWorkloads.csv, refreshables.csv, gateways.csv, gatewayDatasources.csv, gatewayDatasourceUsers.csv, deploymentPipelines.csv, pipelineStages.csv, pipelineStageItems.csv, pipelineUsers.csv, pipelineOperations.csv, availableFeatures.csv'
+       Files = 'PowerBI\workspaces.csv, workspaceUsers.csv, reports.csv, reportPages.csv, reportDatasources.csv, semanticModels.csv, semanticModelDatasources.csv, semanticModelUsers.csv, semanticModelParameters.csv, refreshSchedules.csv, refreshHistory.csv, dashboards.csv, dashboardTiles.csv, dataflows.csv, dataflowDatasources.csv, dataflowTransactions.csv, lineage.csv, apps.csv, appContent.csv, capacities.csv, capacityWorkloads.csv, refreshables.csv, gateways.csv, gatewayDatasources.csv, gatewayDatasourceUsers.csv, deploymentPipelines.csv, pipelineStages.csv, pipelineStageItems.csv, pipelineUsers.csv, pipelineOperations.csv, availableFeatures.csv, modelMigration.csv, targetConnections.csv'
        Needs = @('PbiWorkspaces', 'PowerBI')
        Desc  = 'Power BI content of every workspace the account can see: reports, semantic models, data sources, refreshes, dashboards, dataflows, apps, capacities, gateways, deployment pipelines' }
     @{ Name = 'Fabric';          Group = 'Analytics'; Speed = 'Medium'; OptIn = $false; Perm = 'Workspace member'
@@ -281,7 +283,7 @@ $script:A2CReportCatalog = @(
        Needs = @('PbiWorkspaces', 'PowerBI', 'PowerBIModels')
        Desc  = 'Tables, columns, measures and relationships of every semantic model (DAX INFO.VIEW queries, 4 per model). The service does not return the DAX expressions this way: PowerBIExport (TMDL files) and PowerBIAdmin (adminModelExpressions.csv) have them' }
     @{ Name = 'PowerBIAdmin';    Group = 'Analytics'; Speed = 'Medium'; OptIn = $false; Perm = 'Fabric administrator'
-       Files = 'PowerBI\adminWorkspaces.csv, workspaceScopeSummary.csv, adminWorkspaceUsers.csv, adminItems.csv, adminItemUsers.csv, adminDatasourceInstances.csv, adminModelTables.csv, adminModelExpressions.csv, tenantSettings.csv, adminCapacities.csv, adminApps.csv, widelyShared.csv, adminDomains.csv, scan\scanResult_*.json'
+       Files = 'PowerBI\adminWorkspaces.csv, workspaceScopeSummary.csv, modelMigration.csv, targetConnections.csv, refreshables.csv, adminWorkspaceUsers.csv, adminItems.csv, adminItemUsers.csv, adminDatasourceInstances.csv, adminModelTables.csv, adminModelExpressions.csv, tenantSettings.csv, adminCapacities.csv, adminApps.csv, widelyShared.csv, adminDomains.csv, scan\scanResult_*.json'
        Needs = @('PowerBIAdmin')
        Desc  = 'Whole tenant with the admin APIs: all workspaces (also personal and orphaned), access per item, data source lineage, model expressions (Scanner API), tenant settings. Skipped without the role' }
     @{ Name = 'PowerBIActivity'; Group = 'Analytics'; Speed = 'Slow';   OptIn = $true;  Perm = 'Fabric administrator'
@@ -2092,7 +2094,8 @@ function Get-A2CDatasetPowerBIAdmin {
     $a = [pscustomobject]@{ Problems = $pr; Capacities = @(); Workspaces = [System.Collections.Generic.List[object]]::new()
         Scan = [System.Collections.Generic.List[object]]::new(); DatasourceInstances = [System.Collections.Generic.List[object]]::new()
         TenantSettings = @(); Apps = @(); PublishedToWeb = @(); OrgLinks = @(); Domains = @(); ScanFiles = 0
-        Refreshables = [System.Collections.Generic.List[object]]::new() }
+        Refreshables = [System.Collections.Generic.List[object]]::new(); Datasets = [System.Collections.Generic.List[object]]::new()
+        Refreshes = @{}; RefreshAccess = @{} }
     $script:A2C.Data['PbiAdmin'] = $a
     $cs = [bool]$script:A2C.Options.ClientScope
     $probe = Invoke-A2CPbiList -Path '/admin/capacities' -MaxRetries 2
@@ -2159,6 +2162,18 @@ function Get-A2CDatasetPowerBIAdmin {
         $skip += 1000
     }
 
+    # every semantic model of the tenant with the flags the Scanner API leaves out (on-premises gateway, refreshable)
+    $skip = 0
+    while ($true) {
+        $r = Invoke-A2CPbi ('/admin/datasets?$top=5000&$skip=' + $skip) -MaxRetries 2
+        if (-not $r.Ok) { Add-A2CPbiProblem $pr 'admin semantic models' $r.Error; break }
+        $page = @($r.Json.value | Where-Object { $null -ne $_ })
+        foreach ($x in $page) { $a.Datasets.Add($x) }
+        if ($page.Count -lt 5000) { break }
+        $skip += 5000
+    }
+    if (-not $cs -and [int]$script:A2C.Options.PbiRefreshHistory -gt 0) { Get-A2CPbiAdminRefreshes $a }
+
     # workspaces changed in the last 30 days (the longest the API looks back)
     $since = $script:A2C.Now.AddDays(-30).AddHours(1).ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
     $rm = Invoke-A2CPbi ('/admin/workspaces/modified?modifiedSince=' + [uri]::EscapeDataString($since) + '&excludePersonalWorkspaces=False&excludeInActiveWorkspaces=False') -MaxRetries 2
@@ -2182,6 +2197,48 @@ function Get-A2CDatasetPowerBIAdmin {
     Add-A2CCoverage -Area 'Power BI admin (tenant-wide)' -Status $status -Items $a.Workspaces.Count -Detail $note
     Write-A2CLog -Level Ok ('Tenant: {0} workspace(s), {1} scanned, {2} tenant setting(s)' -f $a.Workspaces.Count, $a.Scan.Count, @($a.TenantSettings).Count)
     return New-A2CDatasetResult -Status $status -Note $note
+}
+
+function Get-A2CPbiAdminRefreshes {
+    # Refresh history of the models in shared workspaces that the PowerBI report did not read. There is no admin API
+    # for it: the workspace API answers only where the account has a role, so the first refused call skips the rest
+    # of that workspace (one call per workspace without access, not one per model).
+    param($A)
+    $done = @{}
+    if (Test-A2CDataset 'PowerBI') { foreach ($w in @($script:A2C.Data['PbiWorkspaces'])) { if ($null -ne $w.Datasets) { $done[$w.Id.ToLowerInvariant()] = $true } } }
+    $shared = @{}
+    foreach ($g in $A.Workspaces) { if ([string]$g.type -eq 'Workspace' -and [string]$g.state -eq 'Active') { $shared[([string]$g.id).ToLowerInvariant()] = $true } }
+    $byWs = [ordered]@{}
+    foreach ($d in $A.Datasets) {
+        $wk = ([string]$d.workspaceId).ToLowerInvariant()
+        if (-not $wk -or $done.ContainsKey($wk) -or -not $shared.ContainsKey($wk) -or $d.isRefreshable -eq $false) { continue }
+        if (-not $byWs.Contains($wk)) { $byWs[$wk] = [System.Collections.Generic.List[object]]::new() }
+        $byWs[$wk].Add($d)
+    }
+    if ($byWs.Count -eq 0) { return }
+    $top = [int]$script:A2C.Options.PbiRefreshHistory
+    $t0 = [DateTime]::Now
+    $i = 0
+    $read = 0
+    foreach ($wk in @($byWs.Keys)) {
+        $i++
+        Write-A2CProgress -Activity 'Refresh history (admin)' -Current $i -Total $byWs.Count -Started $t0
+        $A.RefreshAccess[$wk] = 'Read'
+        foreach ($d in $byWs[$wk]) {
+            $r = Invoke-A2CPbiList -Path ('/groups/' + $wk + '/datasets/' + [string]$d.id + '/refreshes?$top=' + $top) -MaxRetries 2 -MaxItems $top
+            if (-not $r.Ok) {
+                if ($r.Error.Status -in 401, 403, 404) { $A.RefreshAccess[$wk] = 'No access'; break }
+                continue
+            }
+            $A.Refreshes[([string]$d.id).ToLowerInvariant()] = @($r.Items)
+            $read++
+        }
+    }
+    Write-A2CProgress -Activity 'Refresh history (admin)' -Completed
+    $refused = @($A.RefreshAccess.Values | Where-Object { $_ -eq 'No access' }).Count
+    Add-A2CCoverage -Area 'Refresh history as administrator' -Status $(if ($refused -gt 0) { 'Partial' } else { 'Collected' }) -Items $read `
+        -Detail ('{0} model(s) in {1} workspace(s) outside the PowerBI report; {2} workspace(s) refused (the account has no role there: the admin role does not open refresh history)' -f $read, $byWs.Count, $refused)
+    Write-A2CLog -Level Detail ('Refresh history as administrator: {0} model(s) read, {1} of {2} workspace(s) without access' -f $read, $refused, $byWs.Count)
 }
 
 # ---- Principals: everyone and everything with access, looked up in Entra ID ----
@@ -2562,7 +2619,7 @@ function Get-A2CDatasetPowerBIExport { return (Export-A2CPbiContent -WithReports
 # ---- Power BI ----
 # All files are written to the PowerBI folder. Workspace columns come first in every per-workspace file.
 $script:A2CPbiWs = 'Workspace:name WorkspaceId:guid '
-$script:A2CPbiDsCols = 'DatasourceType Name:name Server:fqdn Database:name Url:url Path:path ConnectionString:text GatewayId:guid GatewayName:name DatasourceId:guid ConnectionDetails:json'
+$script:A2CPbiDsCols = 'DatasourceType Name:name Server:fqdn Database:name Url:url Path:path ConnectionString:text GatewayId:guid GatewayName:name GatewayType DatasourceId:guid ConnectionDetails:json'
 
 Register-A2CSchema 'PowerBI/workspaces.csv' ($script:A2CPbiWs + 'Type Description:text CapacityId:guid Capacity:name CapacitySku CapacityRegion IsOnDedicatedCapacity IsReadOnly DomainId:guid ' +
     'DefaultStorageFormat InPowerBI InFabric Reports:num SemanticModels:num Dashboards:num Dataflows:num FabricItems:num Users:num Admins:upn GitState ' +
@@ -2574,7 +2631,7 @@ Register-A2CSchema 'PowerBI/reportPages.csv' ($script:A2CPbiWs + 'Report:name Re
 Register-A2CSchema 'PowerBI/reportDatasources.csv' ($script:A2CPbiWs + 'Report:name ReportId:guid ' + $script:A2CPbiDsCols)
 Register-A2CSchema 'PowerBI/semanticModels.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid ConfiguredBy:upn CreatedDate:date IsRefreshable TargetStorageMode ' +
     'IsEffectiveIdentityRequired IsEffectiveIdentityRolesRequired IsOnPremGatewayRequired AddRowsApiEnabled QueryScaleOut:json Description:text ' +
-    'Reports:num Datasources:num DatasourceTypes StorageModes Measures:num RlsRoles:num ScheduleEnabled LastRefreshStatus LastRefreshEnd:date WebUrl:url ExportedTo:path')
+    'Reports:num Datasources:num DatasourceTypes StorageModes AccessMode IsComposite Measures:num RlsRoles:num ScheduleEnabled LastRefreshStatus LastRefreshEnd:date WebUrl:url ExportedTo:path')
 Register-A2CSchema 'PowerBI/semanticModelDatasources.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid ' + $script:A2CPbiDsCols)
 Register-A2CSchema 'PowerBI/semanticModelUsers.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Identifier:upn PrincipalType AccessRight')
 Register-A2CSchema 'PowerBI/semanticModelParameters.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Parameter:name Type IsRequired CurrentValue:text SuggestedValues:text')
@@ -2592,7 +2649,7 @@ Register-A2CSchema 'PowerBI/appContent.csv' 'App:name AppId:guid ContentType Nam
 Register-A2CSchema 'PowerBI/capacities.csv' 'Capacity:name CapacityId:guid Sku Region State UserAccessRight Admins:upn TenantKeyId:guid Workspaces:num Source'
 Register-A2CSchema 'PowerBI/capacityWorkloads.csv' 'Capacity:name CapacityId:guid Workload State MaxMemoryPercentageSetByUser:num'
 Register-A2CSchema 'PowerBI/refreshables.csv' ('Capacity:name CapacityId:guid Workspace:name WorkspaceId:guid Name:name Id:guid Kind RefreshCount:num RefreshFailures:num ' +
-    'AverageDurationSec:num MedianDurationSec:num RefreshesPerDay:num LastRefreshStatus LastRefreshStart:date LastRefreshEnd:date ScheduleEnabled ScheduleDays ScheduleTimes')
+    'AverageDurationSec:num MedianDurationSec:num RefreshesPerDay:num LastRefreshStatus LastRefreshStart:date LastRefreshEnd:date ScheduleEnabled ScheduleDays ScheduleTimes Source')
 Register-A2CSchema 'PowerBI/gateways.csv' 'Gateway:name GatewayId:guid Type Status Version Members:num Datasources:num Annotation:text Source Properties:json'
 Register-A2CSchema 'PowerBI/gatewayDatasources.csv' 'Gateway:name GatewayId:guid Datasource:name DatasourceId:guid DatasourceType CredentialType ConnectionDetails:json'
 Register-A2CSchema 'PowerBI/gatewayDatasourceUsers.csv' 'Gateway:name GatewayId:guid Datasource:name DatasourceId:guid DisplayName:name Identifier:upn EmailAddress:upn PrincipalType AccessRight'
@@ -2642,14 +2699,14 @@ Register-A2CSchema 'PowerBI/modelMeasures.csv' ($script:A2CPbiWs + 'Model:name M
 Register-A2CSchema 'PowerBI/modelRelationships.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Relationship:name FromTable:name FromColumn:name FromCardinality ToTable:name ToColumn:name ' +
     'ToCardinality IsActive CrossFilteringBehavior Properties:json')
 
-Register-A2CSchema 'PowerBI/adminWorkspaces.csv' ($script:A2CPbiWs + 'Type Scope IsPersonal State IsOnDedicatedCapacity CapacityId:guid Description:text DefaultStorageFormat ' +
+Register-A2CSchema 'PowerBI/adminWorkspaces.csv' ($script:A2CPbiWs + 'Type Scope MigrationClass MigrationReason:note IsPersonal State IsOnDedicatedCapacity CapacityId:guid Description:text DefaultStorageFormat ' +
     'Users:num Admins:upn AdminsDeparted:num NoAdmin Items:num HasContent LastItemChange:date ChangedLast30Days RecentActivities:num ActiveUsers:num DatasourceTypes Datasources:num UsesGateway ' +
     'CreatedDate:date ModifiedDate:date')
 Register-A2CSchema 'PowerBI/workspaceScopeSummary.csv' 'Measure:note Count:num Note:note'
-Register-A2CSchema 'PowerBI/repointingMap.csv' ($script:A2CPbiWs + 'Scope DatasourceType Kind Host:fqdn Target:url Database:name GatewayId:guid UsesGateway Items:num ItemNames:name ' +
+Register-A2CSchema 'PowerBI/repointingMap.csv' ($script:A2CPbiWs + 'Scope DatasourceType Kind Host:fqdn Target:url Database:name GatewayId:guid GatewayType UsesGateway Items:num ItemNames:name ' +
     'Models:num ScheduledModels:num RefreshSchedules ScheduleKnown')
 Register-A2CSchema 'PowerBI/capacityFootprint.csv' ('Capacity:name CapacityId:guid Sku Region State Workspaces:num SharedWithContent:num Items:num ScheduledModels:num ' +
-    'RefreshesPerDay:num AvgRefreshSec:num ActiveUsers:num Note:note')
+    'RefreshesPerDay:num AvgRefreshSec:num ActiveUsers:num ToMigrate:num BatchSize:num Batches:num Note:note')
 Register-A2CSchema 'PowerBI/principals.csv' 'Principal:name Identifier:upn ObjectId:guid PrincipalType AppId:guid Workspaces:num Roles Sources EntraStatus:note Departed'
 Register-A2CSchema 'PowerBI/adminWorkspaceUsers.csv' ($script:A2CPbiWs + 'DisplayName:name Identifier:upn EmailAddress:upn PrincipalType AccessRight UserType GraphId:guid')
 Register-A2CSchema 'PowerBI/adminItems.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid ConfiguredBy:upn CreatedDate:date ModifiedDate:date ModifiedBy:upn Endorsement CertifiedBy:upn ' +
@@ -2925,7 +2982,7 @@ function Get-A2CTmdlObjects {
     $lines = $Text -split "`r?`n"
     $n = $lines.Count
     $indentOf = { param($s) $t = 0; foreach ($ch in $s.ToCharArray()) { if ($ch -eq "`t") { $t += 4 } elseif ($ch -eq ' ') { $t++ } else { break } }; [int][math]::Floor($t / 4) }
-    $rx = '^(table|measure|column|partition|expression|role|tablePermission)\s+(''(?:[^'']|'''')*''|[^\s=]+)\s*(?:=\s*(.*))?$'
+    $rx = '^(model|table|measure|column|partition|expression|role|tablePermission)\s+(''(?:[^'']|'''')*''|[^\s=]+)\s*(?:=\s*(.*))?$'
     $table = ''
     $cur = $null
     $i = 0
@@ -2996,6 +3053,8 @@ function Get-A2CBimObjects {
     $model = $null
     try { $model = (ConvertFrom-A2CJson $Text).model } catch { return , $out }
     $txt = { param($v) if ($null -eq $v) { '' } elseif ($v -is [string]) { $v } else { [string]::Join("`n", @($v)) } }
+    if ($null -eq $model) { return , $out }
+    $out.Add([pscustomobject]@{ Kind = 'model'; Name = 'Model'; Table = ''; Value = ''; Props = @{ defaultMode = [string]$model.defaultMode } })
     foreach ($e in @($model.expressions)) { if ($null -ne $e) { $out.Add([pscustomobject]@{ Kind = 'expression'; Name = [string]$e.name; Table = ''; Value = (& $txt $e.expression); Props = @{} }) } }
     foreach ($t in @($model.tables)) {
         if ($null -eq $t) { continue }
@@ -3158,14 +3217,116 @@ function New-A2CPbiRow {
 }
 
 function Get-A2CPbiDatasourceValues {
-    # Columns of $A2CPbiDsCols for a data source of a model, a paginated report or a dataflow.
-    param($Ds)
+    # Columns of $A2CPbiDsCols for a data source of a model, a paginated report or a dataflow. -OnPrem: the model
+    # says it needs an on-premises gateway (isOnPremGatewayRequired), for a gateway this account cannot see.
+    param($Ds, [bool] $OnPrem = $false)
     $c = $Ds.connectionDetails
     $gw = ''
     if ($Ds.gatewayId) { $gw = [string]$script:A2C.Data['PbiGatewayNames'][[string]$Ds.gatewayId] }
     return [ordered]@{ DatasourceType = [string]$Ds.datasourceType; Name = [string]$Ds.name; Server = [string]$c.server; Database = [string]$c.database
         Url = [string]$c.url; Path = [string]$c.path; ConnectionString = [string]$Ds.connectionString; GatewayId = [string]$Ds.gatewayId; GatewayName = $gw
-        DatasourceId = [string]$Ds.datasourceId; ConnectionDetails = $c }
+        GatewayType = (Get-A2CPbiGatewayKind ([string]$Ds.gatewayId) $OnPrem); DatasourceId = [string]$Ds.datasourceId; ConnectionDetails = $c }
+}
+
+function Get-A2CPbiRefreshableRows {
+    # Rows of refreshables.csv: the capacities this account administers, plus every dedicated capacity of the tenant
+    # when the PowerBIAdmin report ran (the admin API), each model once.
+    param($Refreshables)
+    $rows = [System.Collections.Generic.List[object]]::new()
+    $seen = @{}
+    $a = $script:A2C.Data['PbiAdmin']
+    $lists = @(, @('Capacity admin', @($Refreshables)))
+    if ($null -ne $a -and (Test-A2CDataset 'PowerBIAdmin')) { $lists += , @('Fabric admin', @($a.Refreshables)) }
+    foreach ($pair in $lists) {
+        foreach ($x in $pair[1]) {
+            if ($null -eq $x) { continue }
+            $k = ([string]$x.id).ToLowerInvariant()
+            if ($seen.ContainsKey($k)) { continue }
+            $seen[$k] = $true
+            $rows.Add([ordered]@{ Capacity = [string]$x.capacity.displayName; CapacityId = [string]$x.capacity.id; Workspace = [string]$x.group.name; WorkspaceId = [string]$x.group.id
+                    Name = [string]$x.name; Id = [string]$x.id; Kind = [string]$x.kind; RefreshCount = $x.refreshCount; RefreshFailures = $x.refreshFailures
+                    AverageDurationSec = $x.averageDuration; MedianDurationSec = $x.medianDuration; RefreshesPerDay = $x.refreshesPerDay
+                    LastRefreshStatus = [string]$x.lastRefresh.status; LastRefreshStart = $x.lastRefresh.startTime; LastRefreshEnd = $x.lastRefresh.endTime
+                    ScheduleEnabled = $x.refreshSchedule.enabled; ScheduleDays = (Join-A2C $x.refreshSchedule.days ', '); ScheduleTimes = (Join-A2C $x.refreshSchedule.times ', ')
+                    Source = $pair[0] })
+        }
+    }
+    return , $rows
+}
+
+function Get-A2CPbiConnectionMaps {
+    # Lookups for gateway and credential questions (cached): gateway ID -> kind, connection ID -> connection,
+    # gateway data source ID -> gateway data source. Built from what this account can see (Power BI and Fabric).
+    $m = $script:A2C.Data['PbiConnectionMaps']
+    if ($null -ne $m) { return $m }
+    $m = [pscustomobject]@{ GatewayKind = @{}; Connections = @{}; GatewayDatasources = @{} }
+    $f = $script:A2C.Data['FabricTenant']
+    if ($null -ne $f) {
+        # a connection carries the ID of the gateway cluster it runs on: also the cloud "gateway" of shareable cloud connections
+        foreach ($c in @($f.Connections)) {
+            if ($null -eq $c) { continue }
+            if ($c.id) { $m.Connections[([string]$c.id).ToLowerInvariant()] = $c }
+            if (-not $c.gatewayId) { continue }
+            $k = switch -Wildcard ([string]$c.connectivityType) { 'OnPremisesGateway*' { 'OnPremises' } 'VirtualNetworkGateway*' { 'VirtualNetwork' } default { 'Cloud' } }
+            $m.GatewayKind[([string]$c.gatewayId).ToLowerInvariant()] = $k
+        }
+        foreach ($g in @($f.Gateways)) {
+            if ($null -eq $g -or -not $g.id) { continue }
+            $m.GatewayKind[([string]$g.id).ToLowerInvariant()] = $(if ([string]$g.type -like 'VirtualNetwork*') { 'VirtualNetwork' } else { 'OnPremises' })
+        }
+    }
+    $t = $script:A2C.Data['PbiTenant']
+    if ($null -ne $t) {
+        # the Power BI gateway API lists on-premises gateways only (type Resource, or Personal for a personal-mode gateway)
+        foreach ($g in @($t.Gateways)) {
+            if ($null -eq $g -or -not $g.id) { continue }
+            $m.GatewayKind[([string]$g.id).ToLowerInvariant()] = 'OnPremises'
+            foreach ($d in @(Get-A2CPbiSub $t 'gatewayDatasources' ([string]$g.id))) { if ($null -ne $d -and $d.id) { $m.GatewayDatasources[([string]$d.id).ToLowerInvariant()] = $d } }
+        }
+    }
+    $script:A2C.Data['PbiConnectionMaps'] = $m
+    return $m
+}
+
+function Get-A2CPbiGatewayKind {
+    # What a data source's gateway ID stands for: OnPremises, VirtualNetwork, Cloud, or None. A gateway ID alone does
+    # not mean a gateway: cloud connections carry the ID of a cloud gateway cluster too. An ID this account cannot
+    # see counts as on-premises only when the model says it needs an on-premises gateway.
+    param([string] $GatewayId, [bool] $OnPrem = $false)
+    if (-not $GatewayId -or $GatewayId -match '^[0-]+$') { return 'None' }
+    $k = (Get-A2CPbiConnectionMaps).GatewayKind[$GatewayId.ToLowerInvariant()]
+    if ($k) { return $k }
+    if ($OnPrem) { return 'OnPremises (not visible)' }
+    return 'Cloud'
+}
+
+function Get-A2CPbiDatasourceCredential {
+    # Who a data source refreshes as: the connection it is bound to (gateway, shared cloud, personal cloud) and its
+    # credential type. Personal = stops when that person leaves ($null: cannot tell, the connection is not visible
+    # to this account - someone's personal cloud connection or a shared one without access); Password = Basic or Windows.
+    param([string] $DatasourceId, [string] $GatewayKind)
+    $m = Get-A2CPbiConnectionMaps
+    $k = $DatasourceId.ToLowerInvariant()
+    $identity = ''; $cred = ''
+    $c = $(if ($k) { $m.Connections[$k] } else { $null })
+    $gd = $(if ($k) { $m.GatewayDatasources[$k] } else { $null })
+    if ($null -ne $c) {
+        $cred = [string]$c.credentialDetails.credentialType
+        $identity = switch -Wildcard ([string]$c.connectivityType) {
+            'OnPremisesGatewayPersonal' { 'Personal gateway' } 'OnPremisesGateway*' { 'Gateway connection' } 'VirtualNetworkGateway*' { 'VNet gateway connection' }
+            'PersonalCloud' { 'Personal cloud connection' } 'ShareableCloud' { 'Shared cloud connection' } default { [string]$c.connectivityType } }
+    }
+    elseif ($null -ne $gd) { $identity = 'Gateway connection'; $cred = [string]$gd.credentialType }
+    elseif ($GatewayKind -like 'OnPremises*') { $identity = 'Gateway connection (not visible)' }
+    elseif ($GatewayKind -eq 'VirtualNetwork') { $identity = 'VNet gateway connection (not visible)' }
+    elseif ($GatewayKind -ne 'None') { $identity = 'Cloud connection (not visible)' }
+    # OAuth2 on a connection is the token of the person who signed in when it was set up
+    $personal = (($identity -in @('Personal cloud connection', 'Personal gateway')) -or $cred -eq 'OAuth2')
+    if (-not $personal -and ($identity -eq 'Cloud connection (not visible)' -or (-not $identity -and $GatewayKind -eq 'None'))) { $personal = $null }
+    if (-not $identity) { $identity = 'Not bound to a connection' }
+    $password = ($cred -eq 'Basic' -or $cred -eq 'Windows')
+    $label = $(if ($cred) { '{0} ({1})' -f $identity, $(switch ($cred) { 'WorkspaceIdentity' { 'workspace identity' } 'ServicePrincipal' { 'service principal' } default { $cred } }) } else { $identity })
+    return [pscustomobject]@{ Identity = $identity; CredentialType = $cred; Label = $label; Personal = $personal; Password = $password }
 }
 
 function Get-A2CPbiExportedTo {
@@ -3320,23 +3481,25 @@ function New-A2CReportPowerBI {
             $objs = Get-A2CPbiModelObjects $id
             if ($objs.Count -gt 0) {
                 $mc = @{}
-                foreach ($o in $objs) { if ($o.Kind -eq 'partition') { $mk = [string]$o.Props['mode']; if (-not $mk) { $mk = [string]$o.Value }; $mc[$mk] = [int]$mc[$mk] + 1 } }
+                $def = Get-A2CPbiModelDefaultMode $objs
+                foreach ($o in $objs) { if ($o.Kind -eq 'partition') { $mk = Get-A2CPbiPartitionMode $o $def; $mc[$mk] = [int]$mc[$mk] + 1 } }
                 $modes = Join-A2C @($mc.Keys | Sort-Object | ForEach-Object { '{0} ({1})' -f $_, $mc[$_] })
                 $measures = @($objs | Where-Object { $_.Kind -eq 'measure' }).Count
                 $roles = @($objs | Where-Object { $_.Kind -eq 'role' }).Count
             }
             if ($sched) { $schedEnabled = $sched.enabled }
+            $am = Get-A2CPbiModelFact $id
             $rows['semanticModels'].Add((New-A2CPbiRow $w ([ordered]@{ Model = $name; ModelId = $id; ConfiguredBy = [string]$d.configuredBy; CreatedDate = $d.createdDate
                             IsRefreshable = $d.isRefreshable; TargetStorageMode = [string]$d.targetStorageMode; IsEffectiveIdentityRequired = $d.isEffectiveIdentityRequired
                             IsEffectiveIdentityRolesRequired = $d.isEffectiveIdentityRolesRequired; IsOnPremGatewayRequired = $d.isOnPremGatewayRequired
                             AddRowsApiEnabled = $d.addRowsAPIEnabled; QueryScaleOut = $d.queryScaleOutSettings; Description = [string]$d.description
                             Reports = [int]$modelReports[$id]; Datasources = $sources.Count; DatasourceTypes = (Join-A2C (Get-A2CUnique @($sources | ForEach-Object { $_.datasourceType })))
-                            StorageModes = $modes; Measures = $measures; RlsRoles = $roles
+                            StorageModes = $modes; AccessMode = [string]$am.AccessMode; IsComposite = $am.IsComposite; Measures = $measures; RlsRoles = $roles
                             ScheduleEnabled = $schedEnabled; LastRefreshStatus = $(if ($null -ne $last) { [string]$last.status } else { '' })
                             LastRefreshEnd = $(if ($null -ne $last) { $last.endTime } else { $null }); WebUrl = [string]$d.webUrl; ExportedTo = (Get-A2CPbiExportedTo $id) })))
             foreach ($ds in $sources) {
                 $v = [ordered]@{ Model = $name; ModelId = $id }
-                $dv = Get-A2CPbiDatasourceValues $ds
+                $dv = Get-A2CPbiDatasourceValues $ds ($d.isOnPremGatewayRequired -eq $true)
                 foreach ($k in $dv.Keys) { $v[$k] = $dv[$k] }
                 $rows['semanticModelDatasources'].Add((New-A2CPbiRow $w $v))
             }
@@ -3431,13 +3594,7 @@ function New-A2CReportPowerBI {
                         MaxMemoryPercentageSetByUser = $wl.maxMemoryPercentageSetByUser })
             }
         }
-        foreach ($x in $t.Refreshables) {
-            $rows['refreshables'].Add([ordered]@{ Capacity = [string]$x.capacity.displayName; CapacityId = [string]$x.capacity.id; Workspace = [string]$x.group.name; WorkspaceId = [string]$x.group.id
-                    Name = [string]$x.name; Id = [string]$x.id; Kind = [string]$x.kind; RefreshCount = $x.refreshCount; RefreshFailures = $x.refreshFailures
-                    AverageDurationSec = $x.averageDuration; MedianDurationSec = $x.medianDuration; RefreshesPerDay = $x.refreshesPerDay
-                    LastRefreshStatus = [string]$x.lastRefresh.status; LastRefreshStart = $x.lastRefresh.startTime; LastRefreshEnd = $x.lastRefresh.endTime
-                    ScheduleEnabled = $x.refreshSchedule.enabled; ScheduleDays = (Join-A2C $x.refreshSchedule.days ', '); ScheduleTimes = (Join-A2C $x.refreshSchedule.times ', ') })
-        }
+        foreach ($x in (Get-A2CPbiRefreshableRows $t.Refreshables)) { $rows['refreshables'].Add($x) }
         foreach ($g in $t.Gateways) {
             foreach ($ds in @(Get-A2CPbiSub $t 'gatewayDatasources' ([string]$g.id))) {
                 $rows['gatewayDatasources'].Add([ordered]@{ Gateway = [string]$g.name; GatewayId = [string]$g.id; Datasource = [string]$ds.datasourceName; DatasourceId = [string]$ds.id
@@ -3483,6 +3640,8 @@ function New-A2CReportPowerBI {
         }
     }
     foreach ($f in $files) { Add-A2CRows ('PowerBI/' + $f + '.csv') $rows[$f] }
+    New-A2CPbiModelMigration
+    New-A2CPbiTargetConnections
     Write-A2CLog -Level Ok ('Power BI: {0} reports, {1} semantic models, {2} dashboards, {3} dataflows -> PowerBI folder' -f $rows['reports'].Count, $rows['semanticModels'].Count,
         $rows['dashboards'].Count, $rows['dataflows'].Count)
 }
@@ -3870,13 +4029,14 @@ function New-A2CReportDependencies {
         $w = $d.Ws
         $name = [string]$d.Item.displayName
         $objs = Get-A2CPbiModelObjects $id
+        $def = Get-A2CPbiModelDefaultMode $objs
         $mtexts = [System.Collections.Generic.List[object]]::new()
         $calcTables = @{}
         foreach ($o in $objs) {
             switch ($o.Kind) {
                 'partition' {
                     $src = [string]$o.Props['source']
-                    $rows['modelPartitions'].Add((New-A2CPbiRow $w ([ordered]@{ Model = $name; ModelId = $id; Table = $o.Table; Partition = $o.Name; SourceType = $o.Value; Mode = [string]$o.Props['mode']; Source = $src })))
+                    $rows['modelPartitions'].Add((New-A2CPbiRow $w ([ordered]@{ Model = $name; ModelId = $id; Table = $o.Table; Partition = $o.Name; SourceType = $o.Value; Mode = (Get-A2CPbiPartitionMode $o $def); Source = $src })))
                     if ($o.Value -eq 'm') { $mtexts.Add(@($o.Table, $src)) }
                     elseif ($o.Value -eq 'calculated') { $calcTables[$o.Table] = $src }
                 }
@@ -4337,7 +4497,8 @@ function New-A2CReportPowerBIAdmin {
         $w = [pscustomobject]@{ Name = [string]$g.name; Id = [string]$g.id }
         $users = @($g.users | Where-Object { $null -ne $_ })
         $f = $facts[$w.Id.ToLowerInvariant()]
-        $rows['adminWorkspaces'].Add((New-A2CPbiRow $w ([ordered]@{ Type = [string]$g.type; Scope = $f.Scope; IsPersonal = $f.IsPersonal; State = [string]$g.state
+        $mc = Get-A2CPbiMigrationClass $f
+        $rows['adminWorkspaces'].Add((New-A2CPbiRow $w ([ordered]@{ Type = [string]$g.type; Scope = $f.Scope; MigrationClass = $mc[0]; MigrationReason = $mc[1]; IsPersonal = $f.IsPersonal; State = [string]$g.state
                         IsOnDedicatedCapacity = $g.isOnDedicatedCapacity; CapacityId = [string]$g.capacityId; Description = $(if ($cs) { '' } else { [string]$g.description })
                         DefaultStorageFormat = [string]$g.defaultDatasetStorageFormat; Users = $users.Count; Admins = $f.Admins; AdminsDeparted = $f.AdminsDeparted; NoAdmin = $f.NoAdmin; Items = $f.Items
                         HasContent = $f.HasContent; LastItemChange = $f.LastItemChange; ChangedLast30Days = $f.ChangedRecently; RecentActivities = $f.RecentActivities; ActiveUsers = $f.ActiveUsers
@@ -4380,7 +4541,11 @@ function New-A2CReportPowerBIAdmin {
     }
     if ($cs) { $files = @('adminWorkspaces', 'adminCapacities', 'adminDatasourceInstances') }   # the share-safe set
     foreach ($f in $files) { Add-A2CRows ('PowerBI/' + $f + '.csv') $rows[$f] }
+    # without the PowerBI report: the tenant's refresh statistics (dedicated capacities) still get their file
+    if (-not $cs -and -not $script:A2C.Out.ContainsKey('PowerBI/refreshables.csv')) { Add-A2CRows 'PowerBI/refreshables.csv' (Get-A2CPbiRefreshableRows @()) }
     New-A2CPbiRepointingMap
+    New-A2CPbiModelMigration
+    New-A2CPbiTargetConnections
     New-A2CPbiCapacityFootprint
     New-A2CPbiWorkspacePlan
     New-A2CPbiScopeSummary
@@ -4399,6 +4564,7 @@ function Get-A2CPbiAdminFacts {
     if ($null -eq $a -or -not (Test-A2CDataset 'PowerBIAdmin')) { return , $facts }
     $inst = @{}
     foreach ($d in $a.DatasourceInstances) { if ($d.datasourceId) { $inst[([string]$d.datasourceId).ToLowerInvariant()] = $d } }
+    $onPrem = Get-A2CPbiAdminOnPremModels
     $use = @{}   # data source instance -> number of workspaces that use it
     $dsUse = @{}  # workspace -> data source instance -> items that use it
     $scan = @{}
@@ -4431,13 +4597,17 @@ function Get-A2CPbiAdminFacts {
         }
         $types = [System.Collections.Generic.List[string]]::new()
         $gw = $false
+        $wk = ([string]$sw.id).ToLowerInvariant()
         foreach ($k in $dsIds) {
             $use[$k] = [int]$use[$k] + 1
             $d = $inst[$k]
             if ($null -eq $d) { continue }
             if ($d.datasourceType) { $types.Add([string]$d.datasourceType) }
-            if ($d.gatewayId) { $gw = $true }
+            # a gateway ID alone is no gateway: cloud connections have one too
+            $mp = @($dsUse[$wk][$k] | Where-Object { $_.Type -eq 'datasets' -and $onPrem.ContainsKey(([string]$_.Id).ToLowerInvariant()) }).Count -gt 0
+            if ((Get-A2CPbiGatewayKind ([string]$d.gatewayId) $mp) -match '^(OnPremises|VirtualNetwork)') { $gw = $true }
         }
+        if (@($sw.datasets | Where-Object { $null -ne $_ -and $onPrem.ContainsKey(([string]$_.id).ToLowerInvariant()) }).Count -gt 0) { $gw = $true }
         $scan[([string]$sw.id).ToLowerInvariant()] = [pscustomobject]@{ Items = $n; Last = $last; Types = (Get-A2CUnique $types); Gateway = $gw; Datasources = $dsIds.Count }
     }
     $script:A2C.Data['PbiAdminInstanceUse'] = $use
@@ -4491,6 +4661,14 @@ function Get-A2CPbiAdminFacts {
     return , $facts
 }
 
+function Get-A2CPbiAdminOnPremModels {
+    # IDs of the models that the admin API says need an on-premises gateway (isOnPremGatewayRequired)
+    $h = @{}
+    $a = $script:A2C.Data['PbiAdmin']
+    if ($null -ne $a) { foreach ($x in @($a.Datasets)) { if ($null -ne $x -and $x.isOnPremGatewayRequired -eq $true) { $h[([string]$x.id).ToLowerInvariant()] = $true } } }
+    return $h
+}
+
 function Get-A2CPbiEndpointHost {
     # Host name of a data source from its connection details: server (without port or tcp:), the host of a URL, or
     # the server of a UNC path. Nothing else: no database, path or file.
@@ -4524,6 +4702,7 @@ function New-A2CPbiRepointingMap {
     foreach ($x in $a.Refreshables) { if ($x.id) { $sched[([string]$x.id).ToLowerInvariant()] = $x } }
     $facts = @{}
     foreach ($f in (Get-A2CPbiAdminFacts)) { $facts[$f.Id.ToLowerInvariant()] = $f }
+    $onPrem = Get-A2CPbiAdminOnPremModels
     $rows = [System.Collections.Generic.List[object]]::new()
     foreach ($wk in @($use.Keys)) {
         $f = $facts[$wk]
@@ -4543,9 +4722,10 @@ function New-A2CPbiRepointingMap {
             $host1 = Get-A2CPbiEndpointHost $cd
             $target = [string](Get-A2CFirst $cd @('url', 'path', 'server', 'domain', 'account'))
             $ks = Get-A2CPbiTargetKind ([string]$d.datasourceType) $(if ($target) { $target } else { $host1 })
+            $gk = Get-A2CPbiGatewayKind ([string]$d.gatewayId) (@($models | Where-Object { $onPrem.ContainsKey(([string]$_.Id).ToLowerInvariant()) }).Count -gt 0)
             $rows.Add((New-A2CPbiRow $w ([ordered]@{ Scope = $f.Scope; DatasourceType = [string]$d.datasourceType; Kind = $ks[0]; Host = $host1
                             Target = $(if ($cs) { '' } else { $target }); Database = $(if ($cs) { '' } else { [string]$cd.database }); GatewayId = [string]$d.gatewayId
-                            UsesGateway = [bool]$d.gatewayId; Items = $items.Count; ItemNames = $(if ($cs) { '' } else { Join-A2C @($items | ForEach-Object { $_.Name }) })
+                            GatewayType = $gk; UsesGateway = ($gk -match '^(OnPremises|VirtualNetwork)'); Items = $items.Count; ItemNames = $(if ($cs) { '' } else { Join-A2C @($items | ForEach-Object { $_.Name }) })
                             Models = $models.Count; ScheduledModels = $(if ($schedKnown -like 'No*') { $null } else { $on.Count }); RefreshSchedules = (Join-A2C $times)
                             ScheduleKnown = $schedKnown })))
         }
@@ -4590,6 +4770,9 @@ function New-A2CPbiCapacityFootprint {
             $users = $set.Count
         }
         $durs = @($rf | Where-Object { $null -ne $_.averageDuration } | ForEach-Object { [double]$_.averageDuration })
+        # migration batches: the workspaces that move (classes A to C), a few at a time so the capacity is not throttled
+        $move = @($ws | Where-Object { (Get-A2CPbiMigrationClass $_)[0] -match '^[ABC] ' }).Count
+        $size = Get-A2CPbiBatchSize ([string]$c.sku)
         $rows.Add([ordered]@{
                 Capacity = $(if ($k -eq '') { '(shared capacity)' } elseif ($null -ne $c) { [string]$c.displayName } else { '(capacity not visible)' }); CapacityId = $(if ($k) { $k } else { '' })
                 Sku = [string]$c.sku; Region = [string]$c.region; State = [string]$c.state; Workspaces = $ws.Count
@@ -4598,8 +4781,9 @@ function New-A2CPbiCapacityFootprint {
                 ScheduledModels = $(if ($k -eq '') { $null } else { @($rf | Where-Object { $_.refreshSchedule.enabled -eq $true }).Count })
                 RefreshesPerDay = $(if ($k -eq '') { $null } else { [math]::Round((@($rf | ForEach-Object { [double]$_.refreshesPerDay }) | Measure-Object -Sum).Sum, 1) })
                 AvgRefreshSec = $(if ($durs.Count -gt 0) { [math]::Round(($durs | Measure-Object -Average).Average, 0) } else { $null })
-                ActiveUsers = $users
-                Note = 'estimate: counts, refresh statistics and the activity log; no capacity consumption (CU) data exists in the APIs'
+                ActiveUsers = $users; ToMigrate = $move; BatchSize = $size; Batches = [math]::Ceiling($move / $size)
+                Note = ('estimate: counts, refresh statistics and the activity log; no capacity consumption (CU) data exists in the APIs. Batches: a rule of thumb ' +
+                    'for {0} workspace(s) at a time on this size, run outside business hours and check the Capacity Metrics app after the first batch' -f $size)
             })
     }
     Add-A2CRows 'PowerBI/capacityFootprint.csv' $rows
@@ -4648,6 +4832,25 @@ function New-A2CPbiScopeSummary {
         & $add 'Data source hosts used by shared workspaces with content' (Get-A2CUnique @($map | ForEach-Object { [string]$_['Kind'] + '|' + [string]$_['Host'] })).Count 'what has to be re-pointed at cutover: repointingMap.csv'
         & $add 'Data sources through a gateway (shared workspaces with content)' (Get-A2CUnique @($map | Where-Object { $_['UsesGateway'] -eq $true } | ForEach-Object { [string]$_['Host'] })).Count 'gateways are recreated in the target tenant'
     }
+    # how each workspace moves (adminWorkspaces.csv MigrationClass) and what decides it per model (modelMigration.csv)
+    $classNotes = [ordered]@{ 'A Scriptable copy' = 'copy with scripts or deployment pipelines; cloud or Fabric sources only'
+        'B Re-point' = 'copy, then re-point to new gateways or re-authenticate personal credentials'
+        'C Manual' = 'composite, live connection or push models: rebuild or export and import by hand'
+        'D Deprioritize' = 'personal, empty, not active or stale: confirm before moving'; 'Check' = 'not scanned: look at these by hand' }
+    $cls = @{}
+    foreach ($x in $f) { $c = (Get-A2CPbiMigrationClass $x)[0]; $cls[$c] = [int]$cls[$c] + 1 }
+    foreach ($c in @($classNotes.Keys)) { if ($c -ne 'Check' -or $cls.ContainsKey($c)) { & $add ('Migration class ' + $c) ([int]$cls[$c]) $classNotes[$c] } }
+    $mods = Get-A2CPbiModelFacts
+    if ($mods.Count -gt 0) {
+        & $add 'Semantic models' $mods.Count 'modelMigration.csv has one row per model'
+        foreach ($g in @($mods | Group-Object AccessMode | Sort-Object Name)) { & $add ('Semantic models: ' + $g.Name) $g.Count $(if ($g.Name -in 'Composite', 'LiveConnection', 'Push') { 'manual export and import' } else { '' }) }
+        & $add 'Semantic models through an on-premises gateway' @($mods | Where-Object { $_.OnPremGateway }).Count 'the model says it needs one, or its data source is bound to one'
+        & $add 'Semantic models with a personal credential' @($mods | Where-Object { $_.PersonalCredential -eq 'Yes' }).Count 'stop refreshing when the person leaves; bind to a shared connection first'
+    }
+    if ($script:A2C.Out.ContainsKey('PowerBI/targetConnections.csv')) {
+        $tc = Get-A2CRawRows 'PowerBI/targetConnections.csv'
+        & $add 'Connection targets to create in the target tenant' ([int](@($tc | Where-Object { $_['Connectivity'] -ne 'Fabric (this tenant)' } | ForEach-Object { [int]$_['Targets'] }) | Measure-Object -Sum).Sum) 'targetConnections.csv: per connectivity and type'
+    }
     $pr = $script:A2C.Data['PbiPrincipals']
     if ($null -ne $pr -and $pr.Count -gt 0) {
         $people = @($pr | Where-Object { $_.Type -eq 'User' -or $_.Type -eq 'Guest' })
@@ -4674,6 +4877,377 @@ function New-A2CPbiScopeSummary {
     }
     Add-A2CRows 'PowerBI/workspaceScopeSummary.csv' $rows
     Write-A2CLog -Level Ok ('Scope: {0} workspaces, {1} shared with content, {2} empty personal' -f $f.Count, $content.Count, @($pers | Where-Object { $_.HasContent -eq $false }).Count)
+}
+
+# ---- Migration handling: per model access mode, gateway, refresh identity and health; connection targets ----
+Register-A2CSchema 'PowerBI/modelMigration.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid ConfiguredBy:upn AccessMode IsComposite DirectQueryToModel ModeSource ' +
+    'Datasources:num DatasourceTypes GatewayType OnPremGateway RefreshIdentity CredentialTypes PersonalCredential StoredPassword IsRefreshable ScheduleEnabled ' +
+    'LastRefreshStatus LastRefreshEnd:date Refreshes:num RefreshFailures:num FailureRatePct:num RefreshSource HandlingClass Note:note')
+Register-A2CSchema 'PowerBI/targetConnections.csv' 'Connectivity DatasourceType Kind Targets:num Hosts:fqdn Models:num Items:num Workspaces:num CredentialTypes PersonalBindings:num Note:note'
+
+function Get-A2CPbiModelDefaultMode {
+    # defaultMode of the model (model.tmdl, model.bim); empty when the definition leaves it out, which means import
+    param($Objects)
+    foreach ($o in $Objects) { if ($o.Kind -eq 'model' -and $o.Props['defaultMode']) { return [string]$o.Props['defaultMode'] } }
+    return ''
+}
+
+function Get-A2CPbiPartitionMode {
+    # Storage mode of a partition: its own mode, else the model's default mode (TMDL and model.bim leave out the default, import)
+    param($Partition, [string] $DefaultMode)
+    $m = [string]$Partition.Props['mode']
+    if ($m) { return $m }
+    if ($DefaultMode) { return $DefaultMode }
+    return 'import'
+}
+
+function Get-A2CPbiModelAccessMode {
+    # One access mode per semantic model - Import, DirectLake, DirectQuery, Composite, LiveConnection, Push or Unknown -
+    # from the best source there is: the model definition (partitions), the Scanner API (storage mode of the tables), the
+    # content provider type of the admin API, or the data sources (Analysis Services only: a live connection).
+    param([string] $ModelId, $Scan, $Admin, [string[]] $DatasourceTypes)
+    $modes = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $dqModel = $false
+    $source = ''
+    $objs = Get-A2CPbiModelObjects $ModelId
+    $parts = @($objs | Where-Object { $_.Kind -eq 'partition' })
+    if ($parts.Count -gt 0) {
+        $source = 'Definition'
+        $def = Get-A2CPbiModelDefaultMode $objs
+        foreach ($p in $parts) {
+            # calculated tables, calculation groups and field parameters are computed in the model: no data access of their own
+            if ([string]$p.Value -in 'calculated', 'calculationGroup', 'parameter') { continue }
+            [void]$modes.Add((Get-A2CPbiPartitionMode $p $def))
+        }
+        if ($modes.Count -eq 0) { [void]$modes.Add('import') }
+        # DirectQuery over a Power BI semantic model or Analysis Services: a chained composite model
+        $text = [string]::Join("`n", @($objs | Where-Object { $_.Kind -in 'partition', 'expression' } | ForEach-Object { [string]$_.Value + "`n" + [string]$_.Props['source'] }))
+        $dqModel = ($modes.Contains('directQuery') -and $text -match 'powerbi://|AnalysisServices\.Database|DirectQuery to AS')
+    }
+    elseif ($null -ne $Scan -and @($Scan.tables | Where-Object { $null -ne $_ -and $_.storageMode }).Count -gt 0) {
+        $source = 'Scanner API (tables)'
+        foreach ($tb in @($Scan.tables)) { if ($null -ne $tb -and $tb.storageMode) { [void]$modes.Add([string]$tb.storageMode) } }
+    }
+    $mode = ''
+    if ($modes.Count -gt 0) {
+        $norm = @($modes | ForEach-Object { ($_ -replace '\s', '').ToLowerInvariant() } | Sort-Object -Unique)
+        if ($dqModel -or $norm.Count -gt 1 -or $norm -contains 'dual') { $mode = 'Composite' }
+        else { $mode = switch ($norm[0]) { 'import' { 'Import' } 'directquery' { 'DirectQuery' } 'directlake' { 'DirectLake' } 'push' { 'Push' } default { $norm[0] } } }
+    }
+    else {
+        $cpt = [string](Get-A2CFirst $Admin @('contentProviderType'))
+        if (-not $cpt) { $cpt = [string](Get-A2CFirst $Scan @('contentProviderType')) }
+        if ($cpt) {
+            $source = 'Content provider type'
+            $mode = switch -Regex ($cpt) { 'Composite' { 'Composite'; break } 'DirectQuery' { 'DirectQuery'; break } 'Live' { 'LiveConnection'; break }
+                'Push|Streaming|RealTime' { 'Push'; break } 'Import' { 'Import'; break } default { '' } }
+        }
+        $types = @($DatasourceTypes | Where-Object { $_ })
+        if (-not $mode -and $types.Count -gt 0 -and @($types | Where-Object { $_ -notmatch '^AnalysisServices' }).Count -eq 0) { $mode = 'LiveConnection'; $source = 'Data sources' }
+    }
+    if (-not $mode) { $mode = 'Unknown'; $source = '' }
+    return [pscustomobject]@{ Mode = $mode; IsComposite = ($mode -eq 'Composite'); DirectQueryToModel = $dqModel; Source = $source }
+}
+
+function Get-A2CPbiModelFacts {
+    # One object per semantic model with what the migration decision needs - access mode, gateway, who it refreshes
+    # as, refresh health, handling class - merged from the PowerBI report (workspaces this account is a member of) and
+    # the PowerBIAdmin report (every model of the tenant). Cached.
+    $cache = $script:A2C.Data['PbiModelFacts']
+    if ($null -ne $cache) { return , $cache }
+    $list = [System.Collections.Generic.List[object]]::new()
+    $index = @{}
+    $script:A2C.Data['PbiModelFacts'] = $list
+    $script:A2C.Data['PbiModelFactIndex'] = $index
+    $raw = [ordered]@{}
+    $get = {
+        param([string] $Id, [string] $WsName, [string] $WsId, [string] $Name)
+        $k = $Id.ToLowerInvariant()
+        if (-not $raw.Contains($k)) {
+            $raw[$k] = [pscustomobject]@{ Id = $Id; WsName = $WsName; WsId = $WsId; Name = $Name; ConfiguredBy = ''; IsRefreshable = $null; OnPrem = $null; Member = $false
+                Sources = [System.Collections.Generic.List[object]]::new(); History = $null; HistorySource = ''; Schedule = $null; Scan = $null; Admin = $null }
+        }
+        $raw[$k]
+    }
+    $src = { param($Ds) [pscustomobject]@{ Type = [string]$Ds.datasourceType; DatasourceId = [string](Get-A2CFirst $Ds @('datasourceId')); GatewayId = [string]$Ds.gatewayId; Details = $Ds.connectionDetails } }
+    if (Test-A2CDataset 'PowerBI') {
+        foreach ($w in @($script:A2C.Data['PbiWorkspaces'])) {
+            foreach ($d in @($w.Datasets)) {
+                if ($null -eq $d -or -not $d.id) { continue }
+                $id = [string]$d.id
+                $m = & $get $id $w.Name $w.Id ([string]$d.name)
+                $m.Member = $true; $m.ConfiguredBy = [string]$d.configuredBy; $m.IsRefreshable = $d.isRefreshable; $m.OnPrem = $d.isOnPremGatewayRequired
+                foreach ($ds in @(Get-A2CPbiSub $w 'datasetDatasources' $id)) { if ($null -ne $ds) { $m.Sources.Add((& $src $ds)) } }
+                $h = @(Get-A2CPbiSub $w 'datasetRefreshes' $id)
+                if ($h.Count -gt 0) { $m.History = $h; $m.HistorySource = 'Refresh history' }
+                $m.Schedule = Get-A2CPbiSub $w 'datasetSchedule' $id
+            }
+        }
+    }
+    $a = $script:A2C.Data['PbiAdmin']
+    $isAdmin = ($null -ne $a -and (Test-A2CDataset 'PowerBIAdmin'))
+    if ($isAdmin) {
+        $inst = @{}
+        foreach ($d in $a.DatasourceInstances) { if ($d.datasourceId) { $inst[([string]$d.datasourceId).ToLowerInvariant()] = $d } }
+        $wsNames = @{}
+        foreach ($g in $a.Workspaces) { if ($g.id) { $wsNames[([string]$g.id).ToLowerInvariant()] = [string]$g.name } }
+        foreach ($sw in $a.Scan) {
+            foreach ($x in @($sw.datasets)) {
+                if ($null -eq $x -or -not $x.id) { continue }
+                $m = & $get ([string]$x.id) ([string]$sw.name) ([string]$sw.id) ([string]$x.name)
+                $m.Scan = $x
+                if (-not $m.ConfiguredBy) { $m.ConfiguredBy = [string]$x.configuredBy }
+                if ($m.Member) { continue }   # the workspace API has the data sources with their connection IDs
+                foreach ($u in @($x.datasourceUsages)) {
+                    if ($null -eq $u -or -not $u.datasourceInstanceId) { continue }
+                    $d = $inst[([string]$u.datasourceInstanceId).ToLowerInvariant()]
+                    if ($null -ne $d) { $m.Sources.Add((& $src $d)) }
+                }
+            }
+        }
+        foreach ($x in $a.Datasets) {
+            if ($null -eq $x -or -not $x.id) { continue }
+            $k = ([string]$x.id).ToLowerInvariant()
+            $m = & $get ([string]$x.id) ([string]$wsNames[([string]$x.workspaceId).ToLowerInvariant()]) ([string]$x.workspaceId) ([string]$x.name)
+            $m.Admin = $x
+            if (-not $m.ConfiguredBy) { $m.ConfiguredBy = [string]$x.configuredBy }
+            if ($null -eq $m.IsRefreshable) { $m.IsRefreshable = $x.isRefreshable }
+            if ($null -eq $m.OnPrem) { $m.OnPrem = $x.isOnPremGatewayRequired }
+            $h = $a.Refreshes[$k]
+            if ($null -eq $m.History -and $null -ne $h -and @($h).Count -gt 0) { $m.History = @($h); $m.HistorySource = 'Refresh history (admin)' }
+        }
+    }
+    $ref = @{}
+    $t = $script:A2C.Data['PbiTenant']
+    foreach ($x in @($(if ($null -ne $t) { $t.Refreshables }) + $(if ($isAdmin) { @($a.Refreshables) }))) { if ($null -ne $x -and $x.id) { $ref[([string]$x.id).ToLowerInvariant()] = $x } }
+    $access = $(if ($isAdmin) { $a.RefreshAccess } else { @{} })
+    foreach ($k in @($raw.Keys)) {
+        $m = $raw[$k]
+        $types = @(Get-A2CUnique @($m.Sources | ForEach-Object { $_.Type }))
+        $am = Get-A2CPbiModelAccessMode $m.Id $m.Scan $m.Admin $types
+        $onPrem = ($m.OnPrem -eq $true)
+        $info = [System.Collections.Generic.List[object]]::new()
+        foreach ($s in $m.Sources) {
+            $gk = Get-A2CPbiGatewayKind $s.GatewayId $onPrem
+            $info.Add([pscustomobject]@{ Source = $s; GatewayKind = $gk; Credential = (Get-A2CPbiDatasourceCredential $s.DatasourceId $gk) })
+        }
+        $kinds = @($info | ForEach-Object { $_.GatewayKind })
+        $onPremGw = ($onPrem -or @($kinds | Where-Object { $_ -like 'OnPremises*' }).Count -gt 0)
+        $vnet = (@($kinds | Where-Object { $_ -eq 'VirtualNetwork' }).Count -gt 0)
+        $pc = ''
+        if ($info.Count -gt 0) {
+            $pc = 'No'
+            if (@($info | Where-Object { $null -eq $_.Credential.Personal }).Count -gt 0) { $pc = 'Unknown' }
+            if (@($info | Where-Object { $_.Credential.Personal -eq $true }).Count -gt 0) { $pc = 'Yes' }
+        }
+        $password = (@($info | Where-Object { $_.Credential.Password }).Count -gt 0)
+        # refresh health: the model's own history first, else the statistics of a dedicated capacity
+        $count = $null; $fails = $null; $lastStatus = ''; $lastEnd = $null; $rsrc = ''
+        $rf = $ref[$k]
+        $sched = $(if ($null -ne $m.Schedule) { $m.Schedule.enabled } elseif ($null -ne $rf) { $rf.refreshSchedule.enabled } else { $null })
+        if ($null -ne $m.History) {
+            $h = @($m.History | Where-Object { $null -ne $_ })
+            $count = $h.Count; $fails = @($h | Where-Object { [string]$_.status -eq 'Failed' }).Count
+            if ($h.Count -gt 0) { $lastStatus = [string]$h[0].status; $lastEnd = $h[0].endTime }
+            $rsrc = $m.HistorySource
+        }
+        elseif ($null -ne $rf) {
+            $count = $rf.refreshCount; $fails = $rf.refreshFailures; $lastStatus = [string]$rf.lastRefresh.status; $lastEnd = $rf.lastRefresh.endTime; $rsrc = 'Capacity refreshables'
+        }
+        $notes = [System.Collections.Generic.List[string]]::new()
+        $hc = 'Scriptable copy'
+        if ($am.Mode -in 'Composite', 'LiveConnection', 'Push') {
+            $hc = 'Manual (composite / live / push)'
+            $notes.Add($(switch ($am.Mode) {
+                        'Composite' { $(if ($am.DirectQueryToModel) { 'DirectQuery over another semantic model or Analysis Services' } else { 'mixed storage modes' }) }
+                        'LiveConnection' { 'live connection to Analysis Services' }
+                        default { 'push or streaming model: no source to refresh from' } }))
+        }
+        elseif ($onPremGw -or $vnet) { $hc = 'Re-point (gateway)' }
+        elseif ($pc -eq 'Yes') { $hc = 'Re-authenticate (personal credential)' }
+        elseif ($am.Mode -eq 'Unknown') { $hc = 'Check (mode not known)' }
+        if ($onPremGw) { $notes.Add('needs an on-premises gateway') }
+        if ($vnet) { $notes.Add('uses a VNet gateway') }
+        if ($pc -eq 'Yes') { $notes.Add('refreshes with a personal credential') }
+        elseif ($pc -eq 'Unknown') { $notes.Add('connection not visible to this account: check whose credentials it uses') }
+        if ($password) { $notes.Add('stored password (Basic or Windows)') }
+        if ($null -eq $count -and $m.IsRefreshable -ne $false) {
+            $why = $(if ([string]$access[([string]$m.WsId).ToLowerInvariant()] -eq 'No access') { 'the account has no role in the workspace' } elseif (-not $m.Member) { 'not read' } else { 'none returned' })
+            $notes.Add('no refresh history: ' + $why)
+        }
+        $f = [pscustomobject]@{ WsName = $m.WsName; WsId = $m.WsId; Model = $m.Name; ModelId = $m.Id; ConfiguredBy = $m.ConfiguredBy
+            AccessMode = $am.Mode; IsComposite = $am.IsComposite; DirectQueryToModel = $am.DirectQueryToModel; ModeSource = $am.Source
+            Datasources = $info.Count; DatasourceTypes = (Join-A2C $types); GatewayType = (Join-A2C (Get-A2CUnique @($kinds | Where-Object { $_ -ne 'None' })))
+            OnPremRequired = $onPrem; OnPremGateway = $onPremGw; VNetGateway = $vnet
+            RefreshIdentity = (Join-A2C (Get-A2CUnique @($info | ForEach-Object { $_.Credential.Label })))
+            CredentialTypes = (Join-A2C (Get-A2CUnique @($info | ForEach-Object { $_.Credential.CredentialType })))
+            PersonalCredential = $pc; StoredPassword = $(if ($info.Count -eq 0) { '' } elseif ($password) { 'Yes' } else { 'No' })
+            IsRefreshable = $m.IsRefreshable; ScheduleEnabled = $sched; LastRefreshStatus = $lastStatus; LastRefreshEnd = $lastEnd; Refreshes = $count; RefreshFailures = $fails
+            FailureRatePct = $(if ([int]$count -gt 0 -and $null -ne $fails) { [math]::Round(100.0 * [int]$fails / [int]$count, 0) } else { $null }); RefreshSource = $rsrc
+            HandlingClass = $hc; Note = (Join-A2C $notes); SourceInfo = $info }
+        $list.Add($f)
+        $index[$k] = $f
+    }
+    return , $list
+}
+
+function Get-A2CPbiModelFact {
+    param([string] $ModelId)
+    [void](Get-A2CPbiModelFacts)
+    if (-not $ModelId) { return $null }
+    return $script:A2C.Data['PbiModelFactIndex'][$ModelId.ToLowerInvariant()]
+}
+
+function New-A2CPbiModelMigration {
+    # modelMigration.csv: one row per semantic model with its access mode, gateway, who it refreshes as, refresh
+    # health and how it moves. -ClientScope: no model names and no people.
+    if ($script:A2C.Out.ContainsKey('PowerBI/modelMigration.csv')) { return }
+    $cs = [bool]$script:A2C.Options.ClientScope
+    $rows = [System.Collections.Generic.List[object]]::new()
+    foreach ($f in (Get-A2CPbiModelFacts)) {
+        $rows.Add((New-A2CPbiRow ([pscustomobject]@{ Name = $f.WsName; Id = $f.WsId }) ([ordered]@{ Model = $(if ($cs) { '' } else { $f.Model }); ModelId = $f.ModelId
+                        ConfiguredBy = $(if ($cs) { '' } else { $f.ConfiguredBy }); AccessMode = $f.AccessMode; IsComposite = $f.IsComposite; DirectQueryToModel = $f.DirectQueryToModel
+                        ModeSource = $f.ModeSource; Datasources = $f.Datasources; DatasourceTypes = $f.DatasourceTypes; GatewayType = $f.GatewayType; OnPremGateway = $f.OnPremGateway
+                        RefreshIdentity = $f.RefreshIdentity; CredentialTypes = $f.CredentialTypes; PersonalCredential = $f.PersonalCredential; StoredPassword = $f.StoredPassword
+                        IsRefreshable = $f.IsRefreshable; ScheduleEnabled = $f.ScheduleEnabled; LastRefreshStatus = $f.LastRefreshStatus; LastRefreshEnd = $f.LastRefreshEnd
+                        Refreshes = $f.Refreshes; RefreshFailures = $f.RefreshFailures; FailureRatePct = $f.FailureRatePct; RefreshSource = $f.RefreshSource
+                        HandlingClass = $f.HandlingClass; Note = $f.Note })))
+    }
+    Add-A2CRows 'PowerBI/modelMigration.csv' @($rows | Sort-Object { $_['Workspace'] }, { $_['Model'] })
+}
+
+function New-A2CPbiTargetConnections {
+    # targetConnections.csv: what the target tenant's admin creates before the first refresh, as a checklist - the
+    # distinct data source targets per connectivity (on-premises gateway, VNet gateway, cloud, Fabric in this tenant)
+    # and type, with their hosts, how many models and items use them and the credential types seen.
+    if ($script:A2C.Out.ContainsKey('PowerBI/targetConnections.csv')) { return }
+    $targets = @{}
+    $add = {
+        param($Src, [bool] $OnPrem, [string] $WsId, [string] $ItemId, [bool] $IsModel)
+        $h = Get-A2CPbiEndpointHost $Src.Details
+        $key = ('{0}|{1}|{2}' -f $Src.Type, $h, [string](Get-A2CFirst $Src.Details @('database', 'path', 'url', 'server'))).ToLowerInvariant()
+        $r = $targets[$key]
+        if ($null -eq $r) {
+            $gk = Get-A2CPbiGatewayKind $Src.GatewayId $OnPrem
+            $tg = [string](Get-A2CFirst $Src.Details @('url', 'path', 'server', 'domain', 'account'))
+            $kind = Get-A2CPbiTargetKind $Src.Type $(if ($tg) { $tg } else { $h })
+            $conn = $(if ($gk -like 'OnPremises*') { 'On-premises gateway' } elseif ($gk -eq 'VirtualNetwork') { 'VNet gateway' } elseif ($kind[1] -like 'Fabric*') { 'Fabric (this tenant)' } else { 'Cloud' })
+            $r = [pscustomobject]@{ Type = $Src.Type; Kind = $kind[0]; Conn = $conn; GatewayKind = $gk; Host = $h; Creds = [System.Collections.Generic.List[string]]::new(); Personal = $false
+                Bindings = @{}; Models = @{}; Items = @{}; Ws = @{} }
+            $targets[$key] = $r
+        }
+        $dk = ([string]$Src.DatasourceId).ToLowerInvariant()
+        if ($dk -and -not $r.Bindings.ContainsKey($dk)) {
+            $c = Get-A2CPbiDatasourceCredential $Src.DatasourceId $r.GatewayKind
+            $r.Bindings[$dk] = ($c.Personal -eq $true)
+            if ($c.CredentialType) { $r.Creds.Add($c.CredentialType) }
+        }
+        if ($WsId) { $r.Ws[$WsId.ToLowerInvariant()] = $true }
+        if ($ItemId) { $r.Items[$ItemId.ToLowerInvariant()] = $true; if ($IsModel) { $r.Models[$ItemId.ToLowerInvariant()] = $true } }
+    }
+    foreach ($f in (Get-A2CPbiModelFacts)) { foreach ($i in $f.SourceInfo) { & $add $i.Source $f.OnPremRequired $f.WsId $f.ModelId $true } }
+    $toSrc = { param($Ds) [pscustomobject]@{ Type = [string]$Ds.datasourceType; DatasourceId = [string]$Ds.datasourceId; GatewayId = [string]$Ds.gatewayId; Details = $Ds.connectionDetails } }
+    if (Test-A2CDataset 'PowerBI') {
+        # dataflows and paginated reports have data sources of their own
+        foreach ($w in @($script:A2C.Data['PbiWorkspaces'])) {
+            foreach ($x in @($w.Dataflows)) { if ($null -ne $x) { foreach ($ds in @(Get-A2CPbiSub $w 'dataflowDatasources' ([string]$x.objectId))) { if ($null -ne $ds) { & $add (& $toSrc $ds) $false $w.Id ([string]$x.objectId) $false } } } }
+            foreach ($x in @($w.Reports)) { if ($null -ne $x) { foreach ($ds in @(Get-A2CPbiSub $w 'reportDatasources' ([string]$x.id))) { if ($null -ne $ds) { & $add (& $toSrc $ds) $false $w.Id ([string]$x.id) $false } } } }
+        }
+    }
+    $a = $script:A2C.Data['PbiAdmin']
+    $use = $script:A2C.Data['PbiAdminDatasourceUse']
+    if ($null -ne $a -and $null -ne $use) {
+        $inst = @{}
+        foreach ($d in $a.DatasourceInstances) { if ($d.datasourceId) { $inst[([string]$d.datasourceId).ToLowerInvariant()] = $d } }
+        foreach ($wk in @($use.Keys)) {
+            foreach ($dk in @($use[$wk].Keys)) {
+                $d = $inst[$dk]
+                if ($null -eq $d) { continue }
+                foreach ($it in @($use[$wk][$dk] | Where-Object { $_.Type -ne 'datasets' })) { & $add (& $toSrc $d) $false $wk $it.Id $false }
+            }
+        }
+    }
+    $notes = @{ 'On-premises gateway' = 'install a gateway in the target tenant and create these data sources on it'
+        'VNet gateway' = 'create the VNet gateway (delegated Azure subnet) and these connections in the target tenant'
+        'Cloud' = 'create shared cloud connections in the target tenant, with a service principal or workspace identity where the source allows it'
+        'Fabric (this tenant)' = 'moves with the Fabric items: re-point to the new workspace after the copy' }
+    $groups = [ordered]@{}
+    foreach ($r in $targets.Values) {
+        $gk = $r.Conn + '|' + $r.Type + '|' + $r.Kind
+        if (-not $groups.Contains($gk)) { $groups[$gk] = [System.Collections.Generic.List[object]]::new() }
+        $groups[$gk].Add($r)
+    }
+    $order = @{ 'On-premises gateway' = 0; 'VNet gateway' = 1; 'Cloud' = 2; 'Fabric (this tenant)' = 3 }
+    $rows = [System.Collections.Generic.List[object]]::new()
+    foreach ($gk in @($groups.Keys)) {
+        $g = $groups[$gk]
+        $union = { param([string] $Prop) $h = @{}; foreach ($r in $g) { foreach ($k in $r.$Prop.Keys) { $h[$k] = $true } }; $h.Count }
+        $rows.Add([ordered]@{ Connectivity = $g[0].Conn; DatasourceType = $g[0].Type; Kind = $g[0].Kind; Targets = $g.Count
+                Hosts = (Join-A2C (Get-A2CUnique @($g | ForEach-Object { $_.Host } | Sort-Object))); Models = (& $union 'Models'); Items = (& $union 'Items'); Workspaces = (& $union 'Ws')
+                CredentialTypes = (Join-A2C (Get-A2CUnique @($g | ForEach-Object { $_.Creds }))); PersonalBindings = @($g | ForEach-Object { $_.Bindings.Values } | Where-Object { $_ -eq $true }).Count
+                Note = $notes[$g[0].Conn] })
+    }
+    Add-A2CRows 'PowerBI/targetConnections.csv' @($rows | Sort-Object { $order[$_['Connectivity']] }, { -1 * $_['Targets'] }, { $_['DatasourceType'] })
+}
+
+function Get-A2CPbiMigrationClass {
+    # Handling class of a workspace (Get-A2CPbiAdminFacts) for the migration plan, the first that applies:
+    # D deprioritize (not active, personal, empty, stale), C manual (composite, live connection or push models),
+    # B re-point (gateway or personal credential), A scriptable copy. Returns @(class, reason). Cached per workspace.
+    param($Fact)
+    $cache = $script:A2C.Data['PbiMigrationClass']
+    if ($null -eq $cache) {
+        $cache = @{}
+        $script:A2C.Data['PbiMigrationClass'] = $cache
+        $byWs = @{}
+        foreach ($m in (Get-A2CPbiModelFacts)) {
+            $k = ([string]$m.WsId).ToLowerInvariant()
+            if (-not $byWs.ContainsKey($k)) { $byWs[$k] = [System.Collections.Generic.List[object]]::new() }
+            $byWs[$k].Add($m)
+        }
+        $script:A2C.Data['PbiModelsByWs'] = $byWs
+    }
+    $f = $Fact
+    $wk = $f.Id.ToLowerInvariant()
+    if ($cache.ContainsKey($wk)) { return , $cache[$wk] }
+    $res = $null
+    $last = ConvertTo-A2CUtc $f.LastItemChange
+    $models = @($script:A2C.Data['PbiModelsByWs'][$wk])
+    if (-not $f.Active) { $res = @('D Deprioritize', ('not active ({0})' -f $f.State)) }
+    elseif ($f.IsPersonal) { $res = @('D Deprioritize', 'personal workspace: decide with its owner') }
+    elseif ($f.HasContent -eq $false) { $res = @('D Deprioritize', 'empty') }
+    elseif ($null -eq $f.HasContent) { $res = @('Check', 'not scanned') }
+    elseif ($f.ChangedRecently -ne $true -and [int]$f.RecentActivities -eq 0 -and $null -ne $last -and $last -lt $script:A2C.Now.AddDays(-180)) {
+        $res = @('D Deprioritize', ('stale: no change since {0}{1}' -f $last.ToString('yyyy-MM-dd'), $(if ($null -ne $f.RecentActivities) { ', no activity in the activity log' } else { '' })))
+    }
+    else {
+        $manual = @($models | Where-Object { $_.HandlingClass -like 'Manual*' }).Count
+        $gw = @($models | Where-Object { $_.OnPremGateway -or $_.VNetGateway }).Count
+        $pers = @($models | Where-Object { $_.PersonalCredential -eq 'Yes' }).Count
+        $why = [System.Collections.Generic.List[string]]::new()
+        if ($gw -gt 0) { $why.Add(('{0} model(s) through a gateway' -f $gw)) } elseif ($f.UsesGateway -eq $true) { $why.Add('data sources through a gateway') }
+        if ($pers -gt 0) { $why.Add(('{0} model(s) with a personal credential' -f $pers)) }
+        if ($manual -gt 0) { $res = @('C Manual', ('{0} model(s) in composite, live connection or push mode' -f $manual)) }
+        elseif ($why.Count -gt 0) { $res = @('B Re-point', (Join-A2C $why)) }
+        else { $res = @('A Scriptable copy', $(if ($models.Count -gt 0) { '{0} model(s), no gateway or personal credential' -f $models.Count } else { 'no semantic models' })) }
+    }
+    $cache[$wk] = $res
+    return , $res
+}
+
+function Get-A2CPbiBatchSize {
+    # Rule of thumb: how many workspaces to move at once on a capacity so that the imports and first refreshes of the
+    # migration do not throttle it, from the size in capacity units (F SKU; P, A and EM SKUs converted).
+    param([string] $Sku)
+    $cu = 0
+    if ($Sku -match '^F(\d+)$') { $cu = [int]$Matches[1] }
+    elseif ($Sku -match '^P(\d)$') { $cu = 64 * [math]::Pow(2, [int]$Matches[1] - 1) }
+    elseif ($Sku -match '^(A|EM)(\d)$') { $cu = 8 * [math]::Pow(2, [int]$Matches[2] - 1) }
+    if ($cu -le 0) { return 10 }   # shared capacity or an unknown SKU
+    if ($cu -le 8) { return 3 }
+    if ($cu -le 32) { return 5 }
+    if ($cu -le 64) { return 10 }
+    return 20
 }
 
 function New-A2CReportPowerBIActivity {
@@ -4944,6 +5518,32 @@ Register-A2CFinding -Id 'PBI-21' -Severity Info -Category Migration -Title 'Data
     $h = @{}
     foreach ($r in (Get-A2CRows 'PowerBI/repointingMap.csv')) { if ($r['Host']) { $h[[string]$r['Kind'] + '|' + [string]$r['Host']] = [string]$r['Kind'] } }
     New-A2CFindingResult $h.Count (Get-A2CTopText @($h.Values) 8)
+}
+
+Register-A2CFinding -Id 'PBI-22' -Severity Medium -Category Migration -Title 'Semantic models that refresh with a personal credential' -Needs @() -File 'PowerBI/modelMigration.csv' `
+    -Recommendation 'They refresh with one person''s sign-in (a personal cloud connection, a personal gateway or an OAuth token), stop when that person leaves and do not move with the tenant. Bind them to a shared connection with a service principal or workspace identity before the move.' `
+    -Url 'https://learn.microsoft.com/power-bi/connect-data/service-create-share-cloud-data-sources' -Evaluate {
+    $rows = Get-A2CRows 'PowerBI/modelMigration.csv'
+    $bad = @($rows | Where-Object { $_['PersonalCredential'] -eq 'Yes' })
+    $unknown = @($rows | Where-Object { $_['PersonalCredential'] -eq 'Unknown' }).Count
+    $detail = Get-A2CTopText @($bad | ForEach-Object { $_['Workspace'] }) 8
+    if ($unknown -gt 0) { $detail += ('; {0} more model(s) use a connection this account cannot see (Unknown)' -f $unknown) }
+    New-A2CFindingResult $bad.Count $detail
+}
+
+Register-A2CFinding -Id 'PBI-23' -Severity Medium -Category Migration -Title 'Semantic models in composite, live connection or push mode' -Needs @() -File 'PowerBI/modelMigration.csv' `
+    -Recommendation 'These do not copy as they are: DirectQuery over another semantic model must be re-pointed to the copied model, live connections to the new Analysis Services server, and push models have no source to refresh from. Plan them by hand.' `
+    -Url 'https://learn.microsoft.com/power-bi/transform-model/desktop-composite-models' -Evaluate {
+    $bad = @((Get-A2CRows 'PowerBI/modelMigration.csv') | Where-Object { $_['AccessMode'] -in 'Composite', 'LiveConnection', 'Push' })
+    New-A2CFindingResult $bad.Count (Get-A2CTopText @($bad | ForEach-Object { $_['AccessMode'] }) 5)
+}
+
+Register-A2CFinding -Id 'PBI-24' -Severity Info -Category Migration -Title 'How the workspaces move: migration class per workspace' -Needs @('PowerBIAdmin') -File 'PowerBI/adminWorkspaces.csv' `
+    -Recommendation 'A: copy with scripts. B: copy, then re-point gateways and re-authenticate personal credentials. C: composite, live or push models, by hand. D: personal, empty, not active or stale, confirm before moving. MigrationReason in adminWorkspaces.csv says why.' `
+    -Url 'https://learn.microsoft.com/fabric/admin/portal-workspaces' -Evaluate {
+    $w = @((Get-A2CRows 'PowerBI/adminWorkspaces.csv') | Where-Object { $_['MigrationClass'] -match '^[ABC] ' })
+    $all = Get-A2CRows 'PowerBI/adminWorkspaces.csv'
+    New-A2CFindingResult $w.Count (Get-A2CTopText @($all | ForEach-Object { $_['MigrationClass'] }) 5)
 }
 # ---- end Power BI ----
 

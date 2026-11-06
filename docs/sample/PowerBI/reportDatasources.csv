@@ -1,2 +1,2 @@
-﻿"Workspace","WorkspaceId","Report","ReportId","DatasourceType","Name","Server","Database","Url","Path","ConnectionString","GatewayId","GatewayName","DatasourceId","ConnectionDetails"
-"Sales","aaaaaaaa-0000-0000-0000-000000000001","Invoice: print/layout","r2","SQL","ds","sql1.contoso.com","Invoices","","","","","","rds1","{""database"":""Invoices"",""server"":""sql1.contoso.com""}"
+﻿"Workspace","WorkspaceId","Report","ReportId","DatasourceType","Name","Server","Database","Url","Path","ConnectionString","GatewayId","GatewayName","GatewayType","DatasourceId","ConnectionDetails"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Invoice: print/layout","r2","SQL","ds","sql1.contoso.com","Invoices","","","","","","None","rds1","{""database"":""Invoices"",""server"":""sql1.contoso.com""}"
