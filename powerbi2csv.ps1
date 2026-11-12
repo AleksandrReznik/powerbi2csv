@@ -4274,7 +4274,14 @@ function New-A2CPbiHardcoded {
             $ref = Get-A2CPbiItemRef $g
             if ($null -ne $ref) { & $note $(if ($ref.Type -eq 'Workspace') { 'WorkspaceId' } else { 'ItemId' }) $g $ref (& $scopeOf $ref) }
             elseif ($null -ne $ci -and $null -ne $ci[$g]) { & $note 'ConnectionId' $g ([pscustomobject]@{ Type = 'Connection'; Name = [string]$ci[$g].displayName; Ws = '' }) 'Connection' }
-            else { & $note 'UnknownId' $g $null 'Not in scope' }
+            else {
+                # an ID this run cannot name: the JSON key it stands under says what kind it is (a connection the
+                # account cannot see, a Teams team or channel); anything else may be an item of another workspace
+                $key = [regex]::Match([string]$text, '"(\w+)"\s*:\s*"' + [regex]::Escape($m.Value) + '"').Groups[1].Value
+                if ($key -match '(?i)^connection(Id)?$') { & $note 'ConnectionId' $g ([pscustomobject]@{ Type = 'Connection'; Name = ''; Ws = '' }) 'Connection' }
+                elseif ($key -match '(?i)^(team|channel|chat|tenant|user)Id$') { & $note 'OutsideId' $g $null 'External' }
+                else { & $note 'UnknownId' $g $null 'Not in scope' }
+            }
         }
         $n = @{ Same = 0; OtherWs = 0; OtherEnv = 0; External = 0; Conn = 0; Mail = 0; Unknown = 0 }
         foreach ($f in $found.Values) {

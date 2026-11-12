@@ -268,6 +268,7 @@ Test-Case 'hardcoded references: IDs, OneLake paths, addresses with what they po
     $pl = @($h | Where-Object { $_.Item -eq 'PL_Daily' })
     Assert-Equal 'ItemId Notebook Transform Same workspace' (($pl | Where-Object { $_.Value -eq $global:TWNb2 }) | ForEach-Object { '{0} {1} {2} {3}' -f $_.Kind, $_.PointsToType, $_.PointsTo, $_.Scope })
     Assert-Equal 2 @($pl | Where-Object { $_.Kind -eq 'UnknownId' -and $_.Scope -eq 'Not in scope' }).Count 'the model and its workspace outside the scope'
+    Assert-Equal 'Connection' ($pl | Where-Object { $_.Kind -eq 'ConnectionId' }).Scope 'an ID under a "connection" key is a connection, also one this account cannot see'
     $c = Import-TWCsv $run 'PowerBI/itemPortability.csv'
     Assert-Equal 'Refactor 2' (($c | Where-Object { $_.Item -eq 'PL_Daily' }) | ForEach-Object { $_.Class + ' ' + $_.NotInScope })
     Assert-Equal 'Re-point' ($c | Where-Object { $_.Item -eq 'Transform' }).Class

@@ -235,7 +235,7 @@ function New-TWWorld {
     $fab.Insert(0, (New-TWRoute GET "^/workspaces/$w1/items/bbbbbbbb-[^/]+/(connections|jobs/instances|jobs/\w+/schedules)$" { New-TWList @() }))
     $fab.Insert(0, (New-TWRoute POST "^/workspaces/$w1/items/$($global:TWPl1)/getDefinition$" { New-TWDefinition @{ 'pipeline-content.json' = (ConvertTo-Json -Depth 20 -Compress @{ properties = @{ activities = @(
                                 @{ name = 'Run transform'; type = 'TridentNotebook'; dependsOn = @(); typeProperties = @{ notebookId = $global:TWNb2; workspaceId = $global:TWW1 } },
-                                @{ name = 'Load model'; type = 'SqlServerStoredProcedure'; dependsOn = @(@{ activity = 'Run transform' })
+                                @{ name = 'Load model'; type = 'SqlServerStoredProcedure'; dependsOn = @(@{ activity = 'Run transform' }); externalReferences = @{ connection = 'cccccccc-0000-0000-0000-0000000000c9' }
                                     typeProperties = @{ storedProcedureName = '[dm].[load_data_model]'; storedProcedureParameters = @{ eo_start = @{ value = '1000'; type = 'Int32' } } } },
                                 @{ name = 'Refresh model'; type = 'PBISemanticModelRefresh'; dependsOn = @(@{ activity = 'Load model' }); typeProperties = @{ datasetId = 'dddddddd-0000-0000-0000-00000000000d'; groupId = 'dddddddd-0000-0000-0000-00000000000e' } },
                                 @{ name = 'On failure'; type = 'IfCondition'; dependsOn = @(@{ activity = 'Refresh model' })
