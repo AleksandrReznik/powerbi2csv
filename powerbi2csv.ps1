@@ -263,9 +263,9 @@ $script:A2CReportCatalog = @(
        Needs = @('PbiWorkspaces', 'Fabric', 'FabricSql')
        Desc  = 'Tables, views, stored procedures and functions of every lakehouse SQL endpoint and warehouse, their columns, the code of views and procedures and references between databases (catalog queries over the SQL endpoint)' }
     @{ Name = 'Dependencies';    Group = 'Analytics'; Speed = 'Slow';   OptIn = $false; Perm = 'Contributor on the workspace (item definitions)'
-       Files = 'PowerBI\pipelineActivities.csv, notebookDependencies.csv, dataflowSources.csv, modelPartitions.csv, modelExpressions.csv, modelRoles.csv, modelSources.csv, itemDependencies.csv, externalDependencies.csv (+ StorageModes/Measures/RlsRoles in semanticModels.csv)'
+       Files = 'PowerBI\pipelineActivities.csv, notebookDependencies.csv, dataflowSources.csv, modelPartitions.csv, modelExpressions.csv, modelRoles.csv, modelSources.csv, itemDependencies.csv, externalDependencies.csv, hardcodedReferences.csv, itemPortability.csv, migrationOrder.csv (+ StorageModes/Measures/RlsRoles in semanticModels.csv)'
        Needs = @('PbiWorkspaces', 'PowerBI', 'Fabric', 'ItemDefinitions')
-       Desc  = 'What runs and reads what, from the item definitions: pipeline activities, notebook lakehouses/tables/calls, dataflow sources and destinations, model partitions, DAX and M, roles; all item-to-item links and every external target (SharePoint, SQL, storage, ...)' }
+       Desc  = 'What runs and reads what, from the item definitions: pipeline activities, notebook lakehouses/tables/calls, dataflow sources and destinations, model partitions, DAX and M, roles; all item-to-item links and every external target (SharePoint, SQL, storage, ...); the IDs, paths and addresses written into notebooks, pipelines and dataflows, a portability class per item and the order to create the items in' }
     @{ Name = 'FabricCode';      Group = 'Analytics'; Speed = 'Slow';   OptIn = $true;  Perm = 'Contributor on the workspace (item definitions)'
        Files = 'PowerBI\exportIndex.csv, PowerBI\<workspace>\Notebook\<notebook>\notebook-content.py, PowerBI\<workspace>\<item type>\<item>\* (pipelines, dataflows, semantic models as TMDL, ...), PowerBI\<workspace>\dataflows\*.json, PowerBI\<workspace>\sql\<database>\*.sql'
        Needs = @('PbiWorkspaces', 'PowerBI', 'Fabric', 'FabricCode')
@@ -2921,7 +2921,7 @@ function Get-A2CNotebookDependencies {
             foreach ($m in [regex]::Matches($l, '(?i)\b(?:FROM|JOIN)\s+([A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*){1,2})\b')) { & $add 'ReadsTable' $m.Groups[1].Value '' '' $l }
         }
         foreach ($m in [regex]::Matches($l, '(?:notebookutils|mssparkutils)\.notebook\.run\(\s*' + $name)) { & $add 'RunsNotebook' $m.Groups[1].Value '' '' $l }
-        if ($l -match '^%run\s+(\S+)') { & $add 'RunsNotebook' $Matches[1] '' '' $l }
+        if ($l -match '^%run\s+(?:\./)?(\S+)') { & $add 'RunsNotebook' $Matches[1] '' '' $l }   # "%run ./Name" is the notebook Name
         foreach ($m in [regex]::Matches($l, 'abfss://([^@"''\s]+)@onelake\.dfs\.fabric\.microsoft\.com/([^/"''\s{]+)(/[^"''\s]*)?')) {
             & $add 'OneLakePath' ($m.Groups[1].Value + '/' + $m.Groups[2].Value + $m.Groups[3].Value) $m.Groups[2].Value $m.Groups[1].Value $l
         }
@@ -3875,7 +3875,7 @@ Register-A2CSchema 'PowerBI/itemRuns.csv' ($script:A2CPbiWs + 'ItemType Item:nam
 Register-A2CSchema 'PowerBI/environmentMatrix.csv' 'Solution:name ItemType Item:name DEV:name TEST:name UAT:name PROD:name Environments:num MissingIn'
 Register-A2CSchema 'PowerBI/pipelineActivities.csv' ($script:A2CPbiWs + 'Pipeline:name PipelineId:guid Activity:name Parent:name ActivityType State DependsOn:name RefType RefItem:name RefItemId:guid ' +
     'RefWorkspace:name References:name StoredProcedure:name Parameters:text Connection:name Detail:text TypeProperties:json')
-Register-A2CSchema 'PowerBI/notebookDependencies.csv' ($script:A2CPbiWs + 'Notebook:name NotebookId:guid Relation Target:name TargetType TargetItem:name TargetItemId:guid TargetWorkspace:name Evidence:text')
+Register-A2CSchema 'PowerBI/notebookDependencies.csv' ($script:A2CPbiWs + 'Notebook:name NotebookId:guid Relation Target:name TargetType TargetItem:name TargetItemId:guid TargetWorkspace:name ResolvedBy Evidence:text')
 Register-A2CSchema 'PowerBI/dataflowSources.csv' ($script:A2CPbiWs + 'Dataflow:name DataflowId:guid Generation Query:name Role Connector Target:url Database:name File:name FolderPath:url ' +
     'TargetItemType TargetItem:name TargetWorkspace:name Kind Scope')
 Register-A2CSchema 'PowerBI/modelPartitions.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Table:name Partition:name SourceType Mode Source:text')
@@ -3883,8 +3883,12 @@ Register-A2CSchema 'PowerBI/modelExpressions.csv' ($script:A2CPbiWs + 'Model:nam
 Register-A2CSchema 'PowerBI/modelRoles.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Role:name ModelPermission Table:name FilterExpression:text')
 Register-A2CSchema 'PowerBI/modelSources.csv' ($script:A2CPbiWs + 'Model:name ModelId:guid Query:name Connector Target:url Database:name File:name FolderPath:url TargetItemType TargetItem:name ' +
     'TargetWorkspace:name Kind Scope')
-Register-A2CSchema 'PowerBI/itemDependencies.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid Relation DependsOnType DependsOn:name DependsOnId:guid DependsOnWorkspace:name Via:text')
+Register-A2CSchema 'PowerBI/itemDependencies.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid Relation DependsOnType DependsOn:name DependsOnId:guid DependsOnWorkspace:name Crossing Via:text')
 Register-A2CSchema 'PowerBI/externalDependencies.csv' 'Kind Scope Target:url Detail:text Workspace:name UsedByType UsedBy:name UsedById:guid Via'
+Register-A2CSchema 'PowerBI/hardcodedReferences.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid Kind Value:url PointsToType PointsTo:name PointsToWorkspace:name Scope Occurrences:num Where')
+Register-A2CSchema 'PowerBI/itemPortability.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid Class SameWorkspace:num OtherWorkspace:num OtherEnvironment:num External:num Connections:num ' +
+    'MailAddresses:num NotInScope:num Parameters:num Reason:note')
+Register-A2CSchema 'PowerBI/migrationOrder.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid Wave:num DependsOn:num UsedBy:num CrossWorkspace:num InCycle')
 Register-A2CSchema 'PowerBI/onelakeStorage.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid Tables:num TableFiles:num TableBytes:num TableGB:num FilesAreaFiles:num FilesAreaBytes:num FilesAreaGB:num ' +
     'LastModified:date Status:note')
 Register-A2CSchema 'PowerBI/onelakeTableSizes.csv' ($script:A2CPbiWs + 'ItemType Item:name ItemId:guid Schema:name Table:name Files:num Bytes:num MB:num LastModified:date')
@@ -3901,7 +3905,40 @@ function Add-A2CPbiDependency {
     if ($script:A2C.Data['PbiDependencyKeys'].ContainsKey($key)) { return }
     $script:A2C.Data['PbiDependencyKeys'][$key] = $true
     $l.Add((New-A2CPbiRow $Ws ([ordered]@{ ItemType = $ItemType; Item = $Item; ItemId = $ItemId; Relation = $Relation; DependsOnType = [string]$Ref.Type; DependsOn = [string]$Ref.Name
-                    DependsOnId = [string]$Ref.Id; DependsOnWorkspace = [string]$Ref.Ws; Via = $Via })))
+                    DependsOnId = [string]$Ref.Id; DependsOnWorkspace = [string]$Ref.Ws; Crossing = (Get-A2CPbiCrossing ([string]$Ws.Name) ([string]$Ref.Ws)); Via = $Via })))
+}
+
+function Get-A2CPbiCrossing {
+    # '' inside one workspace; 'Workspace' for another workspace; 'Environment (DEV -> PROD)' when the two workspace
+    # names carry different environments (a name without a suffix counts as PROD, as in the environment matrix).
+    param([string] $FromWorkspace, [string] $ToWorkspace)
+    if (-not $ToWorkspace -or $FromWorkspace -eq $ToWorkspace) { return '' }
+    $a = Get-A2CPbiEnvironment $FromWorkspace
+    $b = Get-A2CPbiEnvironment $ToWorkspace
+    if ($a[1] -ne $b[1]) { return ('Environment ({0} -> {1})' -f $a[1], $b[1]) }
+    return 'Workspace'
+}
+
+function Resolve-A2CNotebookTable {
+    # The lakehouse a table name in notebook code belongs to: "lakehouse.schema.table" or "lakehouse.table" by the
+    # name of an attached lakehouse or of one in the same workspace, any other one- or two-part name in the default
+    # lakehouse. Names built at run time ("{schema}.{table}") stay open. Returns @{ Ref; By }
+    param([string] $Table, $Default, $Attached, $Ws)
+    $none = [pscustomobject]@{ Ref = $null; By = '' }
+    if (-not $Table -or $Table -match '[{}$]') { return $none }
+    $parts = $Table.Split('.')
+    if ($parts.Count -ge 2) {
+        $first = $parts[0].Trim('`', '[', ']')
+        foreach ($r in @($Attached)) { if ($null -ne $r -and $r.Name -eq $first) { return [pscustomobject]@{ Ref = $r; By = 'lakehouse name' } } }
+        foreach ($x in @($Ws.Lakehouses)) {
+            if ($null -ne $x -and [string]$x.displayName -eq $first) {
+                $r = Get-A2CPbiItemRef ([string]$x.id)
+                if ($null -ne $r) { return [pscustomobject]@{ Ref = $r; By = 'lakehouse name' } }
+            }
+        }
+    }
+    if ($parts.Count -le 2 -and $null -ne $Default) { return [pscustomobject]@{ Ref = $Default; By = 'default lakehouse' } }
+    return $none
 }
 
 function Add-A2CPbiExternal {
@@ -3965,8 +4002,20 @@ function New-A2CReportDependencies {
             }
         }
         elseif ($type -eq 'Notebook') {
-            foreach ($dep in (Get-A2CNotebookDependencies (Get-A2CNotebookCode $d.Parts))) {
+            $deps = Get-A2CNotebookDependencies (Get-A2CNotebookCode $d.Parts)
+            # the notebook's own lakehouses, to say which one a table name belongs to
+            $defaultLh = $null
+            $attached = [System.Collections.Generic.List[object]]::new()
+            foreach ($dep in $deps) {
+                if ($dep.Relation -notin @('DefaultLakehouse', 'AttachedLakehouse')) { continue }
+                $r = Get-A2CPbiItemRef $dep.Id
+                if ($null -eq $r) { continue }
+                $attached.Add($r)
+                if ($dep.Relation -eq 'DefaultLakehouse') { $defaultLh = $r }
+            }
+            foreach ($dep in $deps) {
                 $ref = Get-A2CPbiItemRef $dep.Id
+                $by = $(if ($null -ne $ref) { 'ID' } else { '' })
                 $target = $dep.Target
                 $ttype = ''
                 switch -Wildcard ($dep.Relation) {
@@ -3980,15 +4029,26 @@ function New-A2CReportDependencies {
                     'Url'          { $ttype = 'Url' }
                 }
                 if ($dep.Relation -eq 'RunsNotebook' -and $null -eq $ref) {
-                    # a notebook called by name: the one with that name in the same workspace
-                    foreach ($x in $w.Items) { if ([string]$x.type -eq 'Notebook' -and [string]$x.displayName -eq $dep.Target) { $ref = Get-A2CPbiItemRef ([string]$x.id); break } }
+                    # a notebook called by name ("%run ./Name" too): the one with that name in the same workspace
+                    $called = ($dep.Target -replace '^\./', '')
+                    foreach ($x in $w.Items) { if ([string]$x.type -eq 'Notebook' -and [string]$x.displayName -eq $called) { $ref = Get-A2CPbiItemRef ([string]$x.id); break } }
+                    if ($null -ne $ref) { $by = 'notebook name' }
+                }
+                elseif ($dep.Relation -like '*Table') {
+                    $res = Resolve-A2CNotebookTable $dep.Target $defaultLh $attached $w
+                    $ref = $res.Ref
+                    $by = $res.By
                 }
                 $tws = ''
                 if ($null -ne $ref) { $tws = $ref.Ws; if (-not $target) { $target = $ref.Name } }
                 elseif ($dep.WorkspaceId) { $wr = Get-A2CPbiItemRef $dep.WorkspaceId; if ($null -ne $wr) { $tws = $wr.Name } }
                 $rows['notebookDependencies'].Add((New-A2CPbiRow $w ([ordered]@{ Notebook = $name; NotebookId = $id; Relation = $dep.Relation; Target = $target; TargetType = $ttype
-                                TargetItem = $(if ($null -ne $ref) { $ref.Name } else { '' }); TargetItemId = $(if ($null -ne $ref) { $ref.Id } else { $dep.Id }); TargetWorkspace = $tws; Evidence = $dep.Evidence })))
-                if ($null -ne $ref) { Add-A2CPbiDependency $w 'Notebook' $name $id $(if ($dep.Relation -eq 'RunsNotebook') { 'Runs' } else { 'Uses' }) $ref $dep.Relation }
+                                TargetItem = $(if ($null -ne $ref) { $ref.Name } else { '' }); TargetItemId = $(if ($null -ne $ref) { $ref.Id } else { $dep.Id }); TargetWorkspace = $tws
+                                ResolvedBy = $by; Evidence = $dep.Evidence })))
+                if ($null -ne $ref) {
+                    $rel = $(switch ($dep.Relation) { 'RunsNotebook' { 'Runs' } 'ReadsTable' { 'ReadsFrom' } 'WritesTable' { 'WritesTo' } default { 'Uses' } })
+                    Add-A2CPbiDependency $w 'Notebook' $name $id $rel $ref $(if ($dep.Relation -like '*Table') { $dep.Relation + ' ' + $dep.Target } else { $dep.Relation })
+                }
                 if ($dep.Relation -eq 'Url' -or $dep.Relation -eq 'StoragePath') {
                     $ks = Get-A2CPbiTargetKind '' $dep.Target
                     Add-A2CPbiExternal $ks[0] $ks[1] $dep.Target '' $w.Name 'Notebook' $name $id 'notebook code'
@@ -4123,11 +4183,171 @@ function New-A2CReportDependencies {
         }
     }
 
+    New-A2CPbiHardcoded $defs
+    New-A2CPbiMigrationOrder
+
     foreach ($f in $files) { Add-A2CRows ('PowerBI/' + $f + '.csv') $rows[$f] }
     Add-A2CRows 'PowerBI/itemDependencies.csv' @($script:A2C.Data['PbiDependencies'] | Sort-Object { $_['Workspace'] }, { $_['ItemType'] }, { $_['Item'] })
     Add-A2CRows 'PowerBI/externalDependencies.csv' @($script:A2C.Data['PbiExternal'] | Sort-Object { $_['Kind'] }, { $_['Target'] }, { $_['UsedBy'] })
     Write-A2CLog -Level Ok ('Dependencies: {0} pipeline activities, {1} notebook links, {2} dataflow sources, {3} model expressions, {4} item links, {5} external targets' -f $rows['pipelineActivities'].Count,
         $rows['notebookDependencies'].Count, $rows['dataflowSources'].Count, $rows['modelExpressions'].Count, $script:A2C.Data['PbiDependencies'].Count, $script:A2C.Data['PbiExternal'].Count)
+}
+
+$script:A2COneLakeRx = '(?i)abfss://([^@"''\s\\]+)@onelake\.dfs\.fabric\.microsoft\.com(?:/([^/"''\s\\{]+))?[^"''\s\\]*'
+$script:A2CSqlHostRx = '(?i)\b[a-z0-9-]+\.(?:datawarehouse\.fabric\.microsoft\.com|datawarehouse\.pbidedicated\.windows\.net|database\.windows\.net|sql\.azuresynapse\.net)\b'
+$script:A2CUrlRx = '(?i)\b(?:https?|abfss?|wasbs?)://[^"''\s)>\]\\]+'
+$script:A2CMailRx = '(?i)\b[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b'
+$script:A2CParamRx = @{
+    DataPipeline = '(?i)pipeline\(\)\.parameters|variables\(|libraryVariables|pipeline\(\)\.libraryVariables'
+    Notebook     = '(?i)variableLibrary|PARAMETERS CELL|"tags"\s*:\s*\[\s*"parameters"'
+    Dataflow     = '(?i)IsParameterQuery\s*=\s*true'
+}
+
+function New-A2CPbiHardcoded {
+    # hardcodedReferences.csv: every ID, OneLake path, SQL endpoint, address and mail address written into the code of
+    # a notebook, pipeline or dataflow, with what it points to and whether that is the same workspace, another
+    # workspace, another environment or outside Fabric. itemPortability.csv: the same per item, as a class:
+    # Portable (nothing written in), Remap IDs (only IDs of the same workspace), Re-point (connections and outside
+    # addresses), Refactor (reaches into other workspaces or environments, or uses IDs this run cannot name).
+    param($Defs)
+    $refRows = [System.Collections.Generic.List[object]]::new()
+    $portRows = [System.Collections.Generic.List[object]]::new()
+    $ci = $script:A2C.Data['PbiConnectionIndex']
+    foreach ($id in @($Defs.Keys)) {
+        $d = $Defs[$id]
+        $w = $d.Ws
+        $type = [string]$d.Item.type
+        $name = [string]$d.Item.displayName
+        if ($type -notin @('Notebook', 'DataPipeline', 'Dataflow')) { continue }
+        $where = ''
+        $text = ''
+        switch ($type) {
+            'Notebook' {
+                # comment lines are not code (as in notebookDependencies); the META lines hold the attached lakehouses
+                $where = 'notebook code'
+                $text = [string]::Join("`n", @((Get-A2CNotebookCode $d.Parts) -split "`r?`n" | Where-Object { $_ -notmatch '^\s*(?:#|//)' -or $_ -match '^\s*(?:#|//)\s*(?:META|MAGIC)(?:\s|$)' }))
+            }
+            'DataPipeline' { $where = 'pipeline-content.json'; $text = [string]$d.Parts['pipeline-content.json'] }
+            'Dataflow'     { $where = 'mashup.pq'; $text = [string]$d.Parts['mashup.pq'] }
+        }
+        $found = [ordered]@{}
+        $note = {
+            param($Kind, $Value, $Ref, $Scope)
+            $key = ($Kind + '|' + $Value).ToLowerInvariant()
+            if ($found.Contains($key)) { $found[$key].Occurrences++; return }
+            $found[$key] = [pscustomobject]@{ Kind = $Kind; Value = [string]$Value; Scope = $Scope; Occurrences = 1
+                PointsToType = $(if ($null -ne $Ref) { [string]$Ref.Type } else { '' }); PointsTo = $(if ($null -ne $Ref) { [string]$Ref.Name } else { '' })
+                PointsToWorkspace = $(if ($null -ne $Ref) { [string]$Ref.Ws } else { '' }) }
+        }
+        $scopeOf = {
+            param($Ref)
+            $c = Get-A2CPbiCrossing ([string]$w.Name) ([string]$Ref.Ws)
+            if (-not $c) { return 'Same workspace' }
+            if ($c -eq 'Workspace') { return 'Other workspace' }
+            return ('Other environment' + $c.Substring(11))
+        }
+        $rest = [string]$text
+        # OneLake paths first: the IDs inside them are part of the path, not counted again
+        foreach ($m in [regex]::Matches($rest, $script:A2COneLakeRx)) {
+            $ref = Get-A2CPbiItemRef $m.Groups[2].Value
+            if ($null -eq $ref) { $ref = Get-A2CPbiItemRef $m.Groups[1].Value }
+            & $note 'OneLakePath' $m.Value $ref $(if ($null -ne $ref) { & $scopeOf $ref } else { 'Not in scope' })
+        }
+        $rest = [regex]::Replace($rest, $script:A2COneLakeRx, ' ')
+        foreach ($m in [regex]::Matches($rest, $script:A2CSqlHostRx)) {
+            $ref = $null
+            $prefix = $m.Value.ToLowerInvariant() + '|'
+            foreach ($k in @($script:A2C.Data['PbiSqlIndex'].Keys)) { if ($k.StartsWith($prefix)) { $ref = $script:A2C.Data['PbiSqlIndex'][$k]; break } }
+            & $note 'SqlEndpoint' $m.Value $ref $(if ($null -ne $ref) { & $scopeOf $ref } else { 'External' })
+        }
+        $rest = [regex]::Replace($rest, $script:A2CSqlHostRx, ' ')
+        foreach ($m in [regex]::Matches($rest, $script:A2CUrlRx)) {
+            $u = $m.Value.TrimEnd('.', ',', ';')
+            $ks = Get-A2CPbiTargetKind '' $u
+            & $note $(if ($u -match '^(?i)https?:') { 'Url' } else { 'StoragePath' }) (Get-A2CShortText $u 200) $null ([string]$ks[1])
+        }
+        $rest = [regex]::Replace($rest, $script:A2CUrlRx, ' ')
+        foreach ($m in [regex]::Matches($rest, $script:A2CMailRx)) { & $note 'MailAddress' $m.Value $null 'External' }
+        foreach ($m in [regex]::Matches($rest, $script:A2CGuidRx)) {
+            $g = $m.Value.ToLowerInvariant()
+            if ($g -eq $id.ToLowerInvariant() -or $g -eq '00000000-0000-0000-0000-000000000000') { continue }
+            $ref = Get-A2CPbiItemRef $g
+            if ($null -ne $ref) { & $note $(if ($ref.Type -eq 'Workspace') { 'WorkspaceId' } else { 'ItemId' }) $g $ref (& $scopeOf $ref) }
+            elseif ($null -ne $ci -and $null -ne $ci[$g]) { & $note 'ConnectionId' $g ([pscustomobject]@{ Type = 'Connection'; Name = [string]$ci[$g].displayName; Ws = '' }) 'Connection' }
+            else { & $note 'UnknownId' $g $null 'Not in scope' }
+        }
+        $n = @{ Same = 0; OtherWs = 0; OtherEnv = 0; External = 0; Conn = 0; Mail = 0; Unknown = 0 }
+        foreach ($f in $found.Values) {
+            $refRows.Add((New-A2CPbiRow $w ([ordered]@{ ItemType = $type; Item = $name; ItemId = $id; Kind = $f.Kind; Value = $f.Value; PointsToType = $f.PointsToType; PointsTo = $f.PointsTo
+                            PointsToWorkspace = $f.PointsToWorkspace; Scope = $f.Scope; Occurrences = $f.Occurrences; Where = $where })))
+            if ($f.Kind -eq 'MailAddress') { $n.Mail++ }
+            elseif ($f.Scope -eq 'Same workspace') { $n.Same++ }
+            elseif ($f.Scope -eq 'Other workspace') { $n.OtherWs++ }
+            elseif ($f.Scope -like 'Other environment*') { $n.OtherEnv++ }
+            elseif ($f.Scope -eq 'Connection') { $n.Conn++ }
+            elseif ($f.Scope -eq 'Not in scope') { $n.Unknown++ }
+            else { $n.External++ }
+        }
+        $params = [regex]::Matches([string]$text, $script:A2CParamRx[$type]).Count
+        $class = 'Portable'
+        $reason = 'nothing written in'
+        if ($n.OtherWs + $n.OtherEnv + $n.Unknown -gt 0) {
+            $class = 'Refactor'
+            $why = [System.Collections.Generic.List[string]]::new()
+            if ($n.OtherEnv -gt 0) { $why.Add(('{0} to another environment' -f $n.OtherEnv)) }
+            if ($n.OtherWs -gt 0) { $why.Add(('{0} to another workspace' -f $n.OtherWs)) }
+            if ($n.Unknown -gt 0) { $why.Add(('{0} ID(s) or path(s) this run cannot name' -f $n.Unknown)) }
+            $reason = [string]::Join(', ', $why)
+        }
+        elseif ($n.External + $n.Conn + $n.Mail -gt 0) { $class = 'Re-point'; $reason = 'connections, outside addresses or mail addresses' }
+        elseif ($n.Same -gt 0) { $class = 'Remap IDs'; $reason = 'only IDs of the same workspace' }
+        $portRows.Add((New-A2CPbiRow $w ([ordered]@{ ItemType = $type; Item = $name; ItemId = $id; Class = $class; SameWorkspace = $n.Same; OtherWorkspace = $n.OtherWs; OtherEnvironment = $n.OtherEnv
+                        External = $n.External; Connections = $n.Conn; MailAddresses = $n.Mail; NotInScope = $n.Unknown; Parameters = $params; Reason = $reason })))
+    }
+    Add-A2CRows 'PowerBI/hardcodedReferences.csv' @($refRows | Sort-Object { $_['Workspace'] }, { $_['ItemType'] }, { $_['Item'] }, { $_['Kind'] }, { $_['Value'] })
+    Add-A2CRows 'PowerBI/itemPortability.csv' @($portRows | Sort-Object { $_['Workspace'] }, { $_['ItemType'] }, { $_['Item'] })
+}
+
+function New-A2CPbiMigrationOrder {
+    # migrationOrder.csv: the order in which the items can be created in the target, from itemDependencies: wave 1
+    # depends on nothing in scope, wave n on items of earlier waves only. Items that depend on each other in a
+    # circle get no wave (InCycle).
+    $node = @{}
+    $deps = @{}
+    $users = @{}
+    $cross = @{}
+    foreach ($r in @($script:A2C.Data['PbiDependencies'])) {
+        $a = ([string]$r['ItemId']).ToLowerInvariant()
+        $b = ([string]$r['DependsOnId']).ToLowerInvariant()
+        if (-not $a -or -not $b -or $a -eq $b) { continue }
+        if (-not $node.ContainsKey($a)) { $node[$a] = [pscustomobject]@{ Ws = [string]$r['Workspace']; WsId = [string]$r['WorkspaceId']; Type = [string]$r['ItemType']; Name = [string]$r['Item']; Id = [string]$r['ItemId'] } }
+        if (-not $node.ContainsKey($b)) {
+            $ref = Get-A2CPbiItemRef $b
+            $node[$b] = [pscustomobject]@{ Ws = [string]$r['DependsOnWorkspace']; WsId = $(if ($null -ne $ref) { [string]$ref.WsId } else { '' }); Type = [string]$r['DependsOnType']; Name = [string]$r['DependsOn']; Id = [string]$r['DependsOnId'] }
+        }
+        foreach ($h in @($deps, $users)) { foreach ($k in @($a, $b)) { if (-not $h.ContainsKey($k)) { $h[$k] = @{} } } }
+        $deps[$a][$b] = $true
+        $users[$b][$a] = $true
+        if ([string]$r['Crossing']) { if (-not $cross.ContainsKey($a)) { $cross[$a] = @{} }; $cross[$a][$b] = $true }
+    }
+    $wave = @{}
+    do {
+        $progress = $false
+        foreach ($k in @($node.Keys)) {
+            if ($wave.ContainsKey($k)) { continue }
+            $max = 0
+            $ready = $true
+            foreach ($dk in @($deps[$k].Keys)) { if ($wave.ContainsKey($dk)) { if ($wave[$dk] -gt $max) { $max = $wave[$dk] } } else { $ready = $false; break } }
+            if ($ready) { $wave[$k] = $max + 1; $progress = $true }
+        }
+    } while ($progress)
+    $rows = [System.Collections.Generic.List[object]]::new()
+    foreach ($k in @($node.Keys)) {
+        $x = $node[$k]
+        $rows.Add([ordered]@{ Workspace = $x.Ws; WorkspaceId = $x.WsId; ItemType = $x.Type; Item = $x.Name; ItemId = $x.Id; Wave = $(if ($wave.ContainsKey($k)) { $wave[$k] } else { '' })
+                DependsOn = $deps[$k].Count; UsedBy = $users[$k].Count; CrossWorkspace = $(if ($cross.ContainsKey($k)) { $cross[$k].Count } else { 0 }); InCycle = (-not $wave.ContainsKey($k)) })
+    }
+    Add-A2CRows 'PowerBI/migrationOrder.csv' @($rows | Sort-Object { $(if ($_['Wave'] -eq '') { [int]::MaxValue } else { [int]$_['Wave'] }) }, { $_['Workspace'] }, { $_['ItemType'] }, { $_['Item'] })
 }
 
 function Get-A2CPbiShortcutTarget {
@@ -5544,6 +5764,20 @@ Register-A2CFinding -Id 'PBI-24' -Severity Info -Category Migration -Title 'How 
     $w = @((Get-A2CRows 'PowerBI/adminWorkspaces.csv') | Where-Object { $_['MigrationClass'] -match '^[ABC] ' })
     $all = Get-A2CRows 'PowerBI/adminWorkspaces.csv'
     New-A2CFindingResult $w.Count (Get-A2CTopText @($all | ForEach-Object { $_['MigrationClass'] }) 5)
+}
+
+Register-A2CFinding -Id 'PBI-25' -Severity Medium -Category Migration -Title 'Dependencies that cross environments (DEV, TEST, UAT, PROD)' -Needs @('ItemDefinitions') -File 'PowerBI/itemDependencies.csv' `
+    -Recommendation 'An item in one environment reads, writes or runs an item of another one (the Crossing column says which way). Each environment cannot be moved or tested on its own until these links are cut or made a parameter.' `
+    -Url 'https://learn.microsoft.com/fabric/cicd/deployment-pipelines/understand-the-deployment-process' -Evaluate {
+    $x = @((Get-A2CRows 'PowerBI/itemDependencies.csv') | Where-Object { [string]$_['Crossing'] -like 'Environment*' })
+    New-A2CFindingResult $x.Count (Get-A2CTopText @($x | ForEach-Object { ([string]$_['Crossing']).Substring(13).TrimEnd(')') }) 6)
+}
+
+Register-A2CFinding -Id 'PBI-26' -Severity Medium -Category Migration -Title 'Notebooks, pipelines and dataflows that reach into other workspaces by a written-in ID or path' -Needs @('ItemDefinitions') -File 'PowerBI/itemPortability.csv' `
+    -Recommendation 'Class Refactor in itemPortability.csv: the code holds IDs or OneLake paths of another workspace or environment (hardcodedReferences.csv lists them). Every one of them changes in the target tenant; move them into parameters or a variable library before the move.' `
+    -Url 'https://learn.microsoft.com/fabric/cicd/variable-library/variable-library-overview' -Evaluate {
+    $x = @((Get-A2CRows 'PowerBI/itemPortability.csv') | Where-Object { $_['Class'] -eq 'Refactor' })
+    New-A2CFindingResult $x.Count (Get-A2CTopText @($x | ForEach-Object { $_['Workspace'] }) 8)
 }
 # ---- end Power BI ----
 

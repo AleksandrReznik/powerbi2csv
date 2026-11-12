@@ -234,6 +234,59 @@ Test-Case 'notebook dependencies: lakehouses from the metadata, tables, paths, c
         'RunsNotebook=Load bronze; Url=https://api.contoso.com/rates; WritesTable=gold.fact_sales') $got
     Assert-Equal 'Bronze' ($d | Where-Object { $_.Relation -eq 'OneLakePath' }).TargetItem
     Assert-Equal 'nb1' ($d | Where-Object { $_.Relation -eq 'RunsNotebook' }).TargetItemId
+    Assert-Equal 'notebook name' ($d | Where-Object { $_.Relation -eq 'RunsNotebook' }).ResolvedBy
+    # a table name belongs to the lakehouse it names, any other name to the default lakehouse
+    $t = $d | Where-Object { $_.Target -eq 'silver.sales' }
+    Assert-Equal 'Gold lh2 default lakehouse' ('{0} {1} {2}' -f $t.TargetItem, $t.TargetItemId, $t.ResolvedBy)
+    Assert-Equal 'lakehouse name' ($d | Where-Object { $_.Target -eq 'gold.fact_sales' }).ResolvedBy
+}
+Test-Case 'notebook code: "%run ./Name" is the notebook Name; table names by lakehouse name, default lakehouse, or left open' {
+    $r = @(Get-A2CNotebookDependencies "%run ./NB_Util_Config`nx = 1")
+    Assert-Equal 'RunsNotebook=NB_Util_Config' (($r | ForEach-Object { $_.Relation + '=' + $_.Target }) -join '; ')
+    $def = [pscustomobject]@{ Type = 'Lakehouse'; Name = 'ops_lh'; Ws = 'Ops'; Id = 'd1' }
+    $fin = [pscustomobject]@{ Type = 'Lakehouse'; Name = 'finance_lh'; Ws = 'Analytics'; Id = 'f1' }
+    $ws = [pscustomobject]@{ Lakehouses = @() }
+    Assert-Equal 'finance_lh lakehouse name' ((Resolve-A2CNotebookTable 'finance_lh.silver.gcoa' $def @($def, $fin) $ws) | ForEach-Object { $_.Ref.Name + ' ' + $_.By })
+    Assert-Equal 'ops_lh default lakehouse' ((Resolve-A2CNotebookTable 'silver.fact_sales' $def @($def, $fin) $ws) | ForEach-Object { $_.Ref.Name + ' ' + $_.By })
+    Assert-True ($null -eq (Resolve-A2CNotebookTable '{lakehouse_path}.{schema}.{table}' $def @($def) $ws).Ref) 'a name built at run time stays open'
+    Assert-True ($null -eq (Resolve-A2CNotebookTable 'other_lh.silver.t' $def @($def) $ws).Ref) 'three parts with a lakehouse that is not attached stay open'
+    Assert-True ($null -eq (Resolve-A2CNotebookTable 'silver.t' $null @() $ws).Ref) 'no default lakehouse'
+}
+Test-Case 'crossing: same workspace, another workspace, another environment (no suffix = PROD)' {
+    Assert-Equal '' (Get-A2CPbiCrossing 'Sales' 'Sales')
+    Assert-Equal 'Workspace' (Get-A2CPbiCrossing 'Sales - DEV' 'Finance - DEV')
+    Assert-Equal 'Environment (DEV -> PROD)' (Get-A2CPbiCrossing 'Sales - DEV' 'Analytics')
+    Assert-Equal 'Environment (PROD -> TEST)' (Get-A2CPbiCrossing 'Sales' 'Supply Chain - TEST')
+}
+Test-Case 'hardcoded references: IDs, OneLake paths, addresses with what they point to; portability class per item' {
+    $h = Import-TWCsv $run 'PowerBI/hardcodedReferences.csv'
+    $p = $h | Where-Object { $_.Item -eq 'Transform' -and $_.Kind -eq 'OneLakePath' }
+    Assert-Equal 'Lakehouse Bronze Sales Same workspace' ('{0} {1} {2} {3}' -f $p.PointsToType, $p.PointsTo, $p.PointsToWorkspace, $p.Scope)
+    Assert-Equal 'External' ($h | Where-Object { $_.Item -eq 'Transform' -and $_.Kind -eq 'Url' }).Scope
+    Assert-Equal 0 @($h | Where-Object { $_.Value -match 'oldaccount' }).Count 'a path in a comment line of a notebook is not code'
+    Assert-Equal 'Notebook, DataPipeline, Dataflow' ((Import-TWCsv $run 'PowerBI/itemPortability.csv' | ForEach-Object { $_.ItemType } | Select-Object -Unique | Sort-Object { @('Notebook', 'DataPipeline', 'Dataflow').IndexOf($_) }) -join ', ')
+    $pl = @($h | Where-Object { $_.Item -eq 'PL_Daily' })
+    Assert-Equal 'ItemId Notebook Transform Same workspace' (($pl | Where-Object { $_.Value -eq $global:TWNb2 }) | ForEach-Object { '{0} {1} {2} {3}' -f $_.Kind, $_.PointsToType, $_.PointsTo, $_.Scope })
+    Assert-Equal 2 @($pl | Where-Object { $_.Kind -eq 'UnknownId' -and $_.Scope -eq 'Not in scope' }).Count 'the model and its workspace outside the scope'
+    $c = Import-TWCsv $run 'PowerBI/itemPortability.csv'
+    Assert-Equal 'Refactor 2' (($c | Where-Object { $_.Item -eq 'PL_Daily' }) | ForEach-Object { $_.Class + ' ' + $_.NotInScope })
+    Assert-Equal 'Re-point' ($c | Where-Object { $_.Item -eq 'Transform' }).Class
+    Assert-Equal 'Portable' ($c | Where-Object { $_.Item -eq 'Load bronze' }).Class
+    # the dataflow writes to a lakehouse this run cannot name; its SQL endpoint and SharePoint site are addresses
+    $df = $c | Where-Object { $_.Item -eq 'Import files' }
+    Assert-Equal 'Refactor 1' ('{0} {1}' -f $df.Class, $df.NotInScope)
+    Assert-Equal 'SqlEndpoint' ($h | Where-Object { $_.Item -eq 'Import files' -and $_.Value -eq 'abc.datawarehouse.fabric.microsoft.com' }).Kind
+    Assert-Match (Import-TWCsv $run 'findings.csv' | Where-Object { $_.Id -eq 'PBI-26' }).Detail 'Sales \(2\)'
+}
+Test-Case 'migration order: an item comes after everything it depends on' {
+    $o = Import-TWCsv $run 'PowerBI/migrationOrder.csv'
+    $wave = @{}
+    foreach ($x in $o) { $wave[$x.ItemType + ' ' + $x.Item] = [int]$x.Wave }
+    Assert-Equal 1 $wave['Lakehouse Gold']
+    Assert-True ($wave['Notebook Transform'] -gt $wave['Notebook Load bronze']) 'Transform runs Load bronze'
+    Assert-True ($wave['DataPipeline PL_Daily'] -gt $wave['Notebook Transform']) 'the pipeline runs Transform'
+    Assert-True ($wave['Report Sales overview'] -gt $wave['SemanticModel Sales model']) 'a report after its model'
+    Assert-Equal 0 @($o | Where-Object { $_.InCycle -eq 'True' }).Count
 }
 Test-Case 'dataflow sources: file and site, Fabric items by SQL endpoint, destinations, gen1' {
     $s = Import-TWCsv $run 'PowerBI/dataflowSources.csv'
@@ -324,7 +377,7 @@ Test-Case 'admin report is skipped with the reason and writes no admin files' {
 Test-Case 'findings' {
     $f = Import-TWCsv $run 'findings.csv'
     $ids = ($f | ForEach-Object { $_.Id } | Sort-Object) -join ' '
-    Assert-Equal 'PBI-01 PBI-02 PBI-03 PBI-04 PBI-05 PBI-06 PBI-10 PBI-12 PBI-13 PBI-23' $ids
+    Assert-Equal 'PBI-01 PBI-02 PBI-03 PBI-04 PBI-05 PBI-06 PBI-10 PBI-12 PBI-13 PBI-23 PBI-26' $ids
     Assert-Match ($f | Where-Object { $_.Id -eq 'PBI-01' }).Detail 'Sales / Sales model'
     Assert-Match ($f | Where-Object { $_.Id -eq 'PBI-05' }).Detail 'gone@contoso.com'
     Assert-Match ($f | Where-Object { $_.Id -eq 'PBI-06' }).Detail 'Finance DEV'
