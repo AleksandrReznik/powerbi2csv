@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.3.0 - 2026-11-12
+
+What can be copied as it is and what has to be refactored: the IDs, paths and addresses written into the code, a
+portability class per item and the order to create the items in. 12 reports, up to 100 CSV files, 26 findings.
+
+### Portability (`Dependencies`)
+- `hardcodedReferences.csv`: every item ID, workspace ID, connection ID, OneLake path, SQL endpoint, URL, storage
+  path and mail address written into a notebook, pipeline or dataflow, with what it points to (type, name, workspace)
+  and its `Scope`: same workspace, other workspace, other environment (with the direction), connection, external or
+  not in scope. Comment lines of notebooks are skipped. An ID the run cannot name is typed by the JSON key it stands
+  under: a connection the account cannot see stays a connection, a Teams team or channel is outside Fabric.
+- `itemPortability.csv`: one row per notebook, pipeline and dataflow with the counts per scope, the number of
+  parameter and variable uses and a `Class`: Portable (nothing written in), Remap IDs (only IDs of the same
+  workspace), Re-point (connections, outside addresses, mail addresses), Refactor (reaches into other workspaces or
+  environments, or uses IDs the run cannot name).
+- `migrationOrder.csv`: a wave per item from the dependency graph. Wave 1 depends on nothing in scope, wave n only on
+  earlier waves; items that depend on each other in a circle get no wave and `InCycle`.
+- `notebookDependencies.csv`: a table name now resolves to a lakehouse, by the name of an attached lakehouse or one in
+  the same workspace (`lakehouse.schema.table`, `lakehouse.table`), any other name to the default lakehouse. New
+  column `ResolvedBy` (ID, notebook name, lakehouse name, default lakehouse). Names built at run time stay open.
+  Resolved tables also become `ReadsFrom` and `WritesTo` lines in `itemDependencies.csv`.
+- `itemDependencies.csv`: new column `Crossing`: empty inside a workspace, `Workspace`, or
+  `Environment (DEV -> PROD)` when the two workspace names carry different environments (no suffix = PROD, as in the
+  environment matrix).
+- Findings PBI-25 (dependencies that cross environments) and PBI-26 (notebooks, pipelines and dataflows that reach
+  into other workspaces by a written-in ID or path).
+
+### Fixed
+- A notebook called with `%run ./Name` was not matched to the notebook `Name`, so most `%run` calls had no target.
+
+### Changed
+- `notebookDependencies.csv` and `itemDependencies.csv` each have one more column (`ResolvedBy` before `Evidence`,
+  `Crossing` before `Via`). Read them by column name.
+
 ## 1.2.0 - 2026-11-06
 
 How each model and workspace moves: access mode, real gateways, refresh identity and health per model, the

@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 1.2.0
+.VERSION 1.3.0
 .GUID 6f0b1c0e-6a55-4f6b-9a0b-0d0c6f3d7e21
 .AUTHOR Aleksandr Reznik
 .COMPANYNAME it4it.solutions
@@ -9,6 +9,9 @@
 .PROJECTURI https://github.com/AleksandrReznik/powerbi2csv
 .EXTERNALMODULEDEPENDENCIES Az.Accounts
 .RELEASENOTES
+1.3.0 Portability: the IDs, OneLake paths and addresses written into notebooks, pipelines and dataflows, a
+portability class per item, the order to create the items in, table names resolved to a lakehouse, findings
+PBI-25 and PBI-26: 12 reports, up to 100 CSV files, 26 findings.
 1.2.0 Migration handling: access mode, real gateways, refresh identity and health per model, connection targets,
 migration class per workspace, findings PBI-22 to PBI-24: 12 reports, up to 97 CSV files, 24 findings.
 1.1.0 Migration scope for administrators, share-safe -ClientScope run, principals, re-pointing map,
@@ -235,7 +238,7 @@ Set-StrictMode -Version 1.0
 
 #region ============================== 1. CONSTANTS AND CATALOGS ======================================
 
-$script:A2CVersion = '1.2.0'
+$script:A2CVersion = '1.3.0'
 $script:A2CBrand = [ordered]@{
     Tool    = 'powerbi2csv'
     Author  = 'Aleksandr Reznik'

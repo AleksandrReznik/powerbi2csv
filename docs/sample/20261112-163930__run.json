@@ -1,15 +1,15 @@
-{
+﻿{
   "tool": "powerbi2csv",
-  "version": "1.2.0",
-  "startedUtc": "2026-11-06T09:01:23Z",
-  "finishedUtc": "2026-11-06T09:01:25Z",
-  "durationSec": 2.1,
+  "version": "1.3.0",
+  "startedUtc": "2026-11-12T14:39:30Z",
+  "finishedUtc": "2026-11-12T14:39:35Z",
+  "durationSec": 4.2,
   "host": {
-    "PSEdition": "Core",
-    "OutputBase": "C:\\inventory",
     "PSVersion": "7.4.13",
-    "AzAccounts": "9.9.9-test",
     "CloudShell": false,
+    "PSEdition": "Core",
+    "AzAccounts": "9.9.9-test",
+    "OutputBase": "C:\\inventory",
     "ClouddriveExists": false,
     "OS": "Windows"
   },
@@ -74,13 +74,13 @@
     {
       "Stage": "Dataset:PowerBI",
       "Status": "Partial",
-      "DurationSec": 0.1,
+      "DurationSec": 0.3,
       "Note": "2 workspace(s) partly readable with this account"
     },
     {
       "Stage": "Dataset:Fabric",
       "Status": "Collected",
-      "DurationSec": 0.1,
+      "DurationSec": 0.4,
       "Note": ""
     },
     {
@@ -92,7 +92,7 @@
     {
       "Stage": "Dataset:ItemDefinitions",
       "Status": "Collected",
-      "DurationSec": 0.1,
+      "DurationSec": 0.2,
       "Note": ""
     },
     {
@@ -140,13 +140,13 @@
     {
       "Stage": "Report:PowerBI",
       "Status": "Built",
-      "DurationSec": 0.3,
+      "DurationSec": 0.5,
       "Note": ""
     },
     {
       "Stage": "Report:Fabric",
       "Status": "Built",
-      "DurationSec": 0.1,
+      "DurationSec": 0.2,
       "Note": ""
     },
     {
@@ -158,7 +158,7 @@
     {
       "Stage": "Report:Dependencies",
       "Status": "Built",
-      "DurationSec": 0.1,
+      "DurationSec": 0.3,
       "Note": ""
     },
     {
@@ -188,7 +188,7 @@
     {
       "Stage": "Report:PowerBIAdmin",
       "Status": "Built",
-      "DurationSec": 0.2,
+      "DurationSec": 0.6,
       "Note": ""
     },
     {
@@ -205,15 +205,15 @@
     }
   ],
   "apiCalls": {
-    "Throttled": 0,
-    "fabric": 65,
-    "graph": 3,
     "flow": 4,
-    "Retries": 0,
-    "SleepSec": 7.0,
     "onelake": 6,
+    "Retries": 0,
+    "fabric": 65,
+    "Throttled": 0,
+    "SleepSec": 7.0,
+    "pbi": 63,
     "sql": 3,
-    "pbi": 63
+    "graph": 3
   },
   "files": [
     {
@@ -377,12 +377,20 @@
       "rows": 2
     },
     {
+      "file": "PowerBI/hardcodedReferences.csv",
+      "rows": 13
+    },
+    {
       "file": "PowerBI/itemConnections.csv",
       "rows": 1
     },
     {
       "file": "PowerBI/itemDependencies.csv",
-      "rows": 9
+      "rows": 11
+    },
+    {
+      "file": "PowerBI/itemPortability.csv",
+      "rows": 4
     },
     {
       "file": "PowerBI/itemRuns.csv",
@@ -407,6 +415,10 @@
     {
       "file": "PowerBI/managedPrivateEndpoints.csv",
       "rows": 0
+    },
+    {
+      "file": "PowerBI/migrationOrder.csv",
+      "rows": 11
     },
     {
       "file": "PowerBI/modelColumns.csv",
@@ -602,7 +614,7 @@
     },
     {
       "file": "findings.csv",
-      "rows": 18
+      "rows": 19
     },
     {
       "file": "coverage.csv",
@@ -611,7 +623,7 @@
   ],
   "findings": {
     "High": 2,
-    "Medium": 7,
+    "Medium": 8,
     "Low": 2,
     "Info": 7
   },

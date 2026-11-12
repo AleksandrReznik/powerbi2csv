@@ -1,0 +1,141 @@
+﻿[16:39:30] INFO    powerbi2csv 1.3.0  -  https://it4it.solutions  -  aleksandr@reznik.lt
+[16:39:30] INFO    Reports (11): PowerBI, Fabric, FabricSql, Dependencies, FabricCode, FabricStorage, PowerAutomate, PowerBIModels, PowerBIAdmin, PowerBIActivity, Principals
+[16:39:30] INFO    PowerShell 7.4.13, Az.Accounts 9.9.9-test
+[16:39:30] INFO    Tenant 11111111-2222-3333-4444-555555555555, signed in as tester@contoso.com
+[16:39:30] INFO    Output folder: C:\inventory\powerbi2csv_20261112-163930_11111111
+[16:39:31] STEP    PbiWorkspaces: Workspaces in scope (Power BI and Fabric REST with the Az sign-in)
+[16:39:31] OK      2 of 3 visible workspace(s) in scope; "My workspace" left out (-PbiIncludePersonalWorkspaces adds it)
+[16:39:31] STEP    PowerBI: Power BI content per workspace, apps, capacities, gateways, deployment pipelines (Power BI REST)
+[16:39:31] DETAIL  Finance DEV: 0 reports, 0 models, 0 dashboards, 0 dataflows (partial - see coverage.csv)
+[16:39:31] DETAIL  Sales: 2 reports, 2 models, 1 dashboards, 1 dataflows (partial - see coverage.csv)
+[16:39:31] OK      2 workspace(s), 1 app(s), 1 capacities, 0 gateway(s), 1 deployment pipeline(s)
+[16:39:31] STEP    Fabric: Fabric items and workspace settings (Fabric REST)
+[16:39:31] OK      9 Fabric item(s) in 2 workspace(s), 2 connection(s)
+[16:39:31] STEP    FabricSql: Objects of lakehouse SQL endpoints and warehouses (catalog query over the SQL endpoint)
+[16:39:31] OK      11 object(s) in 3 of 3 lakehouse SQL endpoint(s) and warehouse(s)
+[16:39:31] STEP    ItemDefinitions: Definitions of pipelines, notebooks, dataflows and semantic models (getDefinition, 20 at a time)
+[16:39:32] OK      6 of 6 item definition(s) read (pipelines, notebooks, dataflows, semantic models)
+[16:39:32] STEP    FabricCode: Item definitions and SQL code written to files (download)
+[16:39:32] OK      Fabric code download: 7 exported, 2 not exported (see exportIndex.csv)
+[16:39:32] STEP    FabricStorage: OneLake file listing of lakehouse and warehouse tables
+[16:39:32] OK      OneLake size of 2 of 3 lakehouse(s) and warehouse(s) read
+[16:39:32] STEP    PowerAutomate: Power Automate environments and flows (Power Automate REST)
+[16:39:32] OK      Power Automate: 1 environment(s), 1 flow(s); only the flows this account owns or co-owns (all flows need the Power Platform administrator role)
+[16:39:32] STEP    PowerBIModels: Semantic model schema (DAX INFO.VIEW queries, 4 calls per model)
+[16:39:32] OK      Schema of 1 of 2 semantic model(s) read
+[16:39:32] STEP    PowerBIAdmin: Tenant-wide metadata (admin APIs, Scanner API)
+[16:39:32] DETAIL  Refresh history as administrator: 0 model(s) read, 1 of 1 workspace(s) without access
+[16:39:32] OK      Tenant: 5 workspace(s), 4 scanned, 2 tenant setting(s)
+[16:39:32] STEP    PowerBIActivity: Activity log (admin API, one or more calls per day)
+[16:39:32] OK      3 activity event(s) of the last 2 day(s)
+[16:39:32] STEP    Principals: Principals of the collected data, looked up in Entra ID (Microsoft Graph); runs after the other datasets
+[16:39:32] OK      Principals: 6 principal(s), 6 looked up in Entra ID
+[16:39:32] STEP    Building reports
+[16:39:32] OK      Power BI: 2 reports, 2 semantic models, 1 dashboards, 1 dataflows -> PowerBI folder
+[16:39:33] OK      Fabric: 9 items, 5 lakehouse table(s), 1 shortcut(s) -> PowerBI folder
+[16:39:33] OK      Dependencies: 5 pipeline activities, 8 notebook links, 4 dataflow sources, 4 model expressions, 11 item links, 9 external targets
+[16:39:33] OK      Scope: 5 workspaces, 2 shared with content, 1 empty personal
+[16:39:34] OK      Tenant-wide: 5 workspaces, 5 items, 2 tenant settings -> PowerBI folder
+[16:39:34] STEP    Findings
+[16:39:34] OK      19 findings (2 high); 0 rules not evaluated because their data was not selected
+[16:39:34] STEP    Writing files
+[16:39:35] DETAIL  PowerBI/activityEvents.csv                          3 rows
+[16:39:35] DETAIL  PowerBI/adminApps.csv                               1 rows
+[16:39:35] DETAIL  PowerBI/adminCapacities.csv                         1 rows
+[16:39:35] DETAIL  PowerBI/adminDatasourceInstances.csv                2 rows
+[16:39:35] DETAIL  PowerBI/adminDomains.csv                            1 rows
+[16:39:35] DETAIL  PowerBI/adminItems.csv                              5 rows
+[16:39:35] DETAIL  PowerBI/adminItemUsers.csv                          1 rows
+[16:39:35] DETAIL  PowerBI/adminModelExpressions.csv                   2 rows
+[16:39:35] DETAIL  PowerBI/adminModelTables.csv                        1 rows
+[16:39:35] DETAIL  PowerBI/adminWorkspaces.csv                         5 rows
+[16:39:35] DETAIL  PowerBI/adminWorkspaceUsers.csv                     4 rows
+[16:39:35] DETAIL  PowerBI/appContent.csv                              1 rows
+[16:39:35] DETAIL  PowerBI/apps.csv                                    1 rows
+[16:39:35] DETAIL  PowerBI/availableFeatures.csv                       1 rows
+[16:39:35] DETAIL  PowerBI/capacities.csv                              2 rows
+[16:39:35] DETAIL  PowerBI/capacityFootprint.csv                       2 rows
+[16:39:35] DETAIL  PowerBI/capacityWorkloads.csv                       0 rows
+[16:39:35] DETAIL  PowerBI/connections.csv                             2 rows
+[16:39:35] DETAIL  PowerBI/dashboards.csv                              1 rows
+[16:39:35] DETAIL  PowerBI/dashboardTiles.csv                          1 rows
+[16:39:35] DETAIL  PowerBI/dataflowDatasources.csv                     1 rows
+[16:39:35] DETAIL  PowerBI/dataflows.csv                               1 rows
+[16:39:35] DETAIL  PowerBI/dataflowSources.csv                         4 rows
+[16:39:35] DETAIL  PowerBI/dataflowTransactions.csv                    1 rows
+[16:39:35] DETAIL  PowerBI/deploymentPipelines.csv                     1 rows
+[16:39:35] DETAIL  PowerBI/deploymentRoleAssignments.csv               1 rows
+[16:39:35] DETAIL  PowerBI/deploymentStageItems.csv                    2 rows
+[16:39:35] DETAIL  PowerBI/deploymentStages.csv                        2 rows
+[16:39:35] DETAIL  PowerBI/domains.csv                                 1 rows
+[16:39:35] DETAIL  PowerBI/environmentMatrix.csv                       0 rows
+[16:39:35] DETAIL  PowerBI/exportIndex.csv                             9 rows
+[16:39:35] DETAIL  PowerBI/externalDependencies.csv                    9 rows
+[16:39:35] DETAIL  PowerBI/fabricItems.csv                             9 rows
+[16:39:35] DETAIL  PowerBI/flowEnvironments.csv                        1 rows
+[16:39:35] DETAIL  PowerBI/flows.csv                                   1 rows
+[16:39:35] DETAIL  PowerBI/folders.csv                                 2 rows
+[16:39:35] DETAIL  PowerBI/gatewayDatasources.csv                      0 rows
+[16:39:35] DETAIL  PowerBI/gatewayDatasourceUsers.csv                  0 rows
+[16:39:35] DETAIL  PowerBI/gateways.csv                                1 rows
+[16:39:35] DETAIL  PowerBI/gitItemStatus.csv                           2 rows
+[16:39:35] DETAIL  PowerBI/hardcodedReferences.csv                    13 rows
+[16:39:35] DETAIL  PowerBI/itemConnections.csv                         1 rows
+[16:39:35] DETAIL  PowerBI/itemDependencies.csv                       11 rows
+[16:39:35] DETAIL  PowerBI/itemPortability.csv                         4 rows
+[16:39:35] DETAIL  PowerBI/itemRuns.csv                                2 rows
+[16:39:35] DETAIL  PowerBI/itemSchedules.csv                           1 rows
+[16:39:35] DETAIL  PowerBI/lakehouses.csv                              2 rows
+[16:39:35] DETAIL  PowerBI/lakehouseTables.csv                         5 rows
+[16:39:35] DETAIL  PowerBI/lineage.csv                                 2 rows
+[16:39:35] DETAIL  PowerBI/managedPrivateEndpoints.csv                 0 rows
+[16:39:35] DETAIL  PowerBI/migrationOrder.csv                         11 rows
+[16:39:35] DETAIL  PowerBI/modelColumns.csv                            1 rows
+[16:39:35] DETAIL  PowerBI/modelExpressions.csv                        4 rows
+[16:39:35] DETAIL  PowerBI/modelMeasures.csv                           1 rows
+[16:39:35] DETAIL  PowerBI/modelMigration.csv                          3 rows
+[16:39:35] DETAIL  PowerBI/modelPartitions.csv                         2 rows
+[16:39:35] DETAIL  PowerBI/modelRelationships.csv                      1 rows
+[16:39:35] DETAIL  PowerBI/modelRoles.csv                              2 rows
+[16:39:35] DETAIL  PowerBI/modelSources.csv                            1 rows
+[16:39:35] DETAIL  PowerBI/modelTables.csv                             2 rows
+[16:39:35] DETAIL  PowerBI/notebookDependencies.csv                    8 rows
+[16:39:35] DETAIL  PowerBI/onelakeRoles.csv                            1 rows
+[16:39:35] DETAIL  PowerBI/onelakeStorage.csv                          3 rows
+[16:39:35] DETAIL  PowerBI/onelakeTableSizes.csv                       3 rows
+[16:39:35] DETAIL  PowerBI/pipelineActivities.csv                      5 rows
+[16:39:35] DETAIL  PowerBI/pipelineOperations.csv                      1 rows
+[16:39:35] DETAIL  PowerBI/pipelineStageItems.csv                      4 rows
+[16:39:35] DETAIL  PowerBI/pipelineStages.csv                          2 rows
+[16:39:35] DETAIL  PowerBI/pipelineUsers.csv                           1 rows
+[16:39:35] DETAIL  PowerBI/principals.csv                              6 rows
+[16:39:35] DETAIL  PowerBI/refreshables.csv                            1 rows
+[16:39:35] DETAIL  PowerBI/refreshHistory.csv                          2 rows
+[16:39:35] DETAIL  PowerBI/refreshSchedules.csv                        1 rows
+[16:39:35] DETAIL  PowerBI/repointingMap.csv                           2 rows
+[16:39:35] DETAIL  PowerBI/reportDatasources.csv                       1 rows
+[16:39:35] DETAIL  PowerBI/reportPages.csv                             2 rows
+[16:39:35] DETAIL  PowerBI/reports.csv                                 2 rows
+[16:39:35] DETAIL  PowerBI/semanticModelDatasources.csv                1 rows
+[16:39:35] DETAIL  PowerBI/semanticModelParameters.csv                 0 rows
+[16:39:35] DETAIL  PowerBI/semanticModels.csv                          2 rows
+[16:39:35] DETAIL  PowerBI/semanticModelUsers.csv                      1 rows
+[16:39:35] DETAIL  PowerBI/shortcuts.csv                               1 rows
+[16:39:35] DETAIL  PowerBI/sparkPools.csv                              1 rows
+[16:39:35] DETAIL  PowerBI/sparkSessions.csv                           1 rows
+[16:39:35] DETAIL  PowerBI/sqlColumns.csv                              2 rows
+[16:39:35] DETAIL  PowerBI/sqlModules.csv                              2 rows
+[16:39:35] DETAIL  PowerBI/sqlObjects.csv                             11 rows
+[16:39:35] DETAIL  PowerBI/sqlReferences.csv                           1 rows
+[16:39:35] DETAIL  PowerBI/targetConnections.csv                       4 rows
+[16:39:35] DETAIL  PowerBI/tenantSettings.csv                          2 rows
+[16:39:35] DETAIL  PowerBI/warehouses.csv                              1 rows
+[16:39:35] DETAIL  PowerBI/widelyShared.csv                            1 rows
+[16:39:35] DETAIL  PowerBI/workspaceGit.csv                            2 rows
+[16:39:35] DETAIL  PowerBI/workspaceNetwork.csv                        1 rows
+[16:39:35] DETAIL  PowerBI/workspaceRoleAssignments.csv                3 rows
+[16:39:35] DETAIL  PowerBI/workspaces.csv                              2 rows
+[16:39:35] DETAIL  PowerBI/workspaceScopeSummary.csv                  36 rows
+[16:39:35] DETAIL  PowerBI/workspaceSparkSettings.csv                  1 rows
+[16:39:35] DETAIL  PowerBI/workspaceUsers.csv                          2 rows
+[16:39:35] OK      Done in 00:00:04: 5 workspace(s), 101 files, 19 findings (2 high), 144 API calls.

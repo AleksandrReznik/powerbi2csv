@@ -1,0 +1,5 @@
+﻿"Workspace","WorkspaceId","ItemType","Item","ItemId","Class","SameWorkspace","OtherWorkspace","OtherEnvironment","External","Connections","MailAddresses","NotInScope","Parameters","Reason"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Dataflow","Import files","bbbbbbbb-0000-0000-0000-000000000003","Refactor","2","0","0","2","0","0","1","0","1 ID(s) or path(s) this run cannot name"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","DataPipeline","PL_Daily","bbbbbbbb-0000-0000-0000-000000000002","Refactor","2","0","0","0","1","0","2","0","2 ID(s) or path(s) this run cannot name"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Notebook","Load bronze","nb1","Portable","0","0","0","0","0","0","0","0","nothing written in"
+"Sales","aaaaaaaa-0000-0000-0000-000000000001","Notebook","Transform","bbbbbbbb-0000-0000-0000-000000000001","Re-point","2","0","0","1","0","0","0","0","connections, outside addresses or mail addresses"
