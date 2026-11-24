@@ -773,6 +773,70 @@ Test-Case '-PbiExportMaxSizeMB stops report downloads, -Zip packs the run folder
     Assert-True (Test-Path -LiteralPath (Join-Path $global:TWOut ($r.RunName + '.zip')))
 }
 
+Write-Host 'Report definitions' -ForegroundColor Cyan
+$global:TWReportModel = 'cccccccc-0000-0000-0000-000000000001'
+function New-TWReportDefinition {
+    # A report in the layout with one file per page: 2 pages (one drill-through), 1 visual, 1 bookmark, 1 report-level measure, 1 custom visual
+    return (New-TWDefinition ([ordered]@{
+                'definition.pbir'                         = '{"version":"4.0","datasetReference":{"byConnection":{"connectionString":"Data Source=\"powerbi://api.powerbi.com/v1.0/myorg/Sales EU\";initial catalog=\"Sales model\";integrated security=ClaimsToken;semanticmodelid=' + $global:TWReportModel + '"}}}'
+                'definition/report.json'                  = '{"publicCustomVisuals":["Sankey123"]}'
+                'definition/reportExtensions.json'        = '{"entities":[{"name":"Sales","measures":[{"name":"Margin"}]}]}'
+                'definition/pages/p1/page.json'           = '{"name":"p1"}'
+                'definition/pages/p2/page.json'           = '{"name":"p2","pageBinding":{"type":"Drillthrough"}}'
+                'definition/pages/p1/visuals/v1/visual.json' = '{}'
+                'definition/bookmarks/b1.bookmark.json'   = '{}'
+            }))
+}
+Test-Case 'ReportDefinitions: the definition is written and read, no report file is downloaded' {
+    Reset-TWState
+    $global:TW.FabricRoutes.Insert(0, (New-TWRoute POST '/items/r1/getDefinition$' { New-TWReportDefinition }))
+    $r = Invoke-TWRun -Params @{ Reports = 'PowerBI,Fabric,ReportDefinitions' } -KeepWorld
+    Assert-Equal '' ($global:TWUnrouted -join ' | ')
+    Assert-Equal 0 @($global:TWRequests | Where-Object { $_.Uri -match '/Export$' }).Count 'no .pbix download'
+    $f = Import-TWCsv $r 'PowerBI/reportFeatures.csv' | Where-Object { $_.ReportId -eq 'r1' }
+    Assert-Equal 'Read|One file per page|2|1|1' ($f.Status, $f.Layout, $f.Pages, $f.Visuals, $f.Bookmarks -join '|')
+    Assert-Equal '1|Sales[Margin]|1|Sankey123|1|0' ($f.ReportMeasures, $f.ReportMeasureNames, $f.CustomVisuals, $f.CustomVisualNames, $f.DrillthroughPages, $f.TooltipPages -join '|')
+    Assert-Equal ('Connection|Sales EU|Sales model|' + $global:TWReportModel) ($f.ModelReference, $f.ModelWorkspace, $f.Model, $f.ModelId -join '|')
+    Assert-Equal 'PowerBI/Sales/Report/Sales overview' $f.DefinitionPath
+    Assert-True (Test-Path -LiteralPath (Join-Path $r.OutDir 'PowerBI\Sales\Report\Sales overview\definition\pages\p2\page.json'))
+    Assert-Equal 'PowerBI/Sales/Report/Sales overview' (Import-TWCsv $r 'PowerBI/reports.csv' | Where-Object { $_.ReportId -eq 'r1' }).ExportedTo
+    $x = Import-TWCsv $r 'PowerBI/exportIndex.csv' | Where-Object { $_.ItemId -eq 'r1' }
+    Assert-Equal 'Report definition Exported 7' ($x.ItemType, $x.Kind, $x.Status, $x.Files -join ' ')
+    $ids = (@(Import-TWCsv $r 'findings.csv' | Where-Object { $_.Id -match '^PBI-2[789]$' } | ForEach-Object { $_.Id }) | Sort-Object) -join ' '
+    Assert-Equal 'PBI-27 PBI-28' $ids
+    Assert-Match (Import-TWCsv $r 'findings.csv' | Where-Object { $_.Id -eq 'PBI-28' }).Detail 'Sankey123'
+}
+Test-Case 'ReportDefinitions: single-file layout, a report without visuals, a report that cannot be exported' {
+    $cfg = ConvertTo-Json -Compress -Depth 9 @{ bookmarks = @(@{ name = 'b1' }, @{ name = 'b2' }); modelExtensions = @(@{ entities = @(@{ name = 'T'; measures = @(@{ name = 'M1' }, @{ name = 'M2' }) }) }) }
+    $legacy = New-TWDefinition ([ordered]@{
+            'definition.pbir' = '{"version":"1.0","datasetReference":{"byPath":null,"byConnection":{"connectionString":null,"pbiModelDatabaseName":"' + $global:TWReportModel + '","connectionType":"pbiServiceXmlaStyleLive"}}}'
+            'report.json'     = (ConvertTo-Json -Compress -Depth 9 @{ config = $cfg; publicCustomVisuals = @('Aster1'); sections = @(
+                        @{ name = 's1'; config = '{}'; visualContainers = @(@{ x = 1 }, @{ x = 2 }) }, @{ name = 's2'; config = '{"pageBinding":{"type":"Tooltip"}}'; visualContainers = @(@{ x = 3 }) }) })
+        })
+    $f = Get-A2CPbiReportFeatures (ConvertFrom-A2CJson (ConvertTo-Json -Depth 9 $legacy)).definition
+    Assert-Equal 'Single file|2|3|2|T[M1]; T[M2]|Aster1|0|1' ($f.Layout, $f.Pages, $f.Visuals, $f.Bookmarks, ($f.Measures -join '; '), ($f.Custom -join '; '), $f.Drillthrough, $f.Tooltip -join '|')
+    Assert-Equal ('Connection|' + $global:TWReportModel) ($f.Reference, $f.ModelId -join '|')
+    Reset-TWState
+    $global:TW.FabricRoutes.Insert(0, (New-TWRoute POST '/items/r1/getDefinition$' { New-TWDefinition ([ordered]@{ 'definition.pbir' = '{"version":"4.0","datasetReference":{"byPath":{"path":"../m.SemanticModel"}}}'
+                        'report.json' = '{"sections":[{"name":"s1","config":"{}","visualContainers":[]}]}' }) }))
+    $r = Invoke-TWRun -Params @{ Reports = 'PowerBI,Fabric,ReportDefinitions' } -KeepWorld
+    $f = Import-TWCsv $r 'PowerBI/reportFeatures.csv' | Where-Object { $_.ReportId -eq 'r1' }
+    Assert-Equal 'Read|Single file|1|0|Path' ($f.Status, $f.Layout, $f.Pages, $f.Visuals, $f.ModelReference -join '|')
+    Assert-Equal 'PBI-29' ((@(Import-TWCsv $r 'findings.csv' | Where-Object { $_.Id -match '^PBI-2[789]$' } | ForEach-Object { $_.Id })) -join ' ')
+    $r2 = Invoke-TWRun -Params @{ Reports = 'PowerBI,Fabric,ReportDefinitions' }
+    $f2 = Import-TWCsv $r2 'PowerBI/reportFeatures.csv' | Where-Object { $_.ReportId -eq 'r1' }
+    Assert-Equal 'Not exported||' ($f2.Status, $f2.Layout, $f2.DefinitionPath -join '|')
+    Assert-Match $f2.Detail 'OperationNotSupportedForItem'
+    Assert-Equal 'Partial' (Get-TWCoverage $r2 'Report definitions')['Status']
+}
+Test-Case 'ReportDefinitions together with PowerBIExport: each definition is fetched once' {
+    Reset-TWState
+    $global:TW.FabricRoutes.Insert(0, (New-TWRoute POST '/items/r1/getDefinition$' { New-TWReportDefinition }))
+    $r = Invoke-TWRun -Params @{ Reports = 'PowerBI,Fabric,ReportDefinitions,PowerBIExport' } -KeepWorld
+    Assert-Equal 1 @($global:TWRequests | Where-Object { $_.Method -eq 'POST' -and $_.Uri -match '/items/r1/getDefinition' }).Count
+    Assert-Equal 'PowerBI/Sales/Report/Sales overview' (Import-TWCsv $r 'PowerBI/reportFeatures.csv' | Where-Object { $_.ReportId -eq 'r1' }).DefinitionPath
+}
+
 $failed = Complete-Tests
 if (-not $KeepOutput) { Remove-Item -LiteralPath $global:TWOut -Recurse -Force -ErrorAction SilentlyContinue } else { Write-Host ('Output kept in ' + $global:TWOut) }
 exit $failed

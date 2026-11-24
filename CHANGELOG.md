@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.4.0 - 2026-11-24
+
+Report definitions without the report files: what is needed to move reports to another tenant and connect them to
+the semantic models there. 13 reports, up to 101 CSV files, 29 findings.
+
+### Report definitions (`ReportDefinitions`, new, opt-in)
+- Downloads the definition of every report (getDefinition, 20 at a time) to `PowerBI/<workspace>/Report/<report>`.
+  No `.pbix` file is downloaded, so no data leaves the tenant. Each report gets a line in `exportIndex.csv`, and
+  `ExportedTo` in `reports.csv` is filled.
+- `reportFeatures.csv`: one row per report with the layout (one file per page, or the older single file), the number
+  of pages, visuals and bookmarks, the report-level measures and custom visuals with their names, the number of
+  drill-through and tooltip pages, the semantic model the report points to (workspace, name, ID, read from
+  `definition.pbir`) and `DefinitionPath`. A report that cannot be exported is listed with `Status` Not exported and
+  the reason.
+- In the profiles Full and Migration. Needs the Contributor role in the workspace, like `FabricCode`.
+- Together with `PowerBIExport` each definition is fetched once.
+- Findings PBI-27 (reports with report-level measures: check them after a move), PBI-28 (reports with custom
+  visuals: the names to allow in the target tenant) and PBI-29 (reports without visuals: most are the blank report
+  created when only a semantic model is published).
+
 ## 1.3.0 - 2026-11-12
 
 What can be copied as it is and what has to be refactored: the IDs, paths and addresses written into the code, a

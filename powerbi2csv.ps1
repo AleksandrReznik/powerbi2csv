@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 1.3.0
+.VERSION 1.4.0
 .GUID 6f0b1c0e-6a55-4f6b-9a0b-0d0c6f3d7e21
 .AUTHOR Aleksandr Reznik
 .COMPANYNAME it4it.solutions
@@ -9,6 +9,9 @@
 .PROJECTURI https://github.com/AleksandrReznik/powerbi2csv
 .EXTERNALMODULEDEPENDENCIES Az.Accounts
 .RELEASENOTES
+1.4.0 Report definitions without report files: report ReportDefinitions, reportFeatures.csv (pages, visuals,
+bookmarks, report-level measures, custom visuals, the model each report points to), findings PBI-27 to PBI-29:
+13 reports, up to 101 CSV files, 29 findings.
 1.3.0 Portability: the IDs, OneLake paths and addresses written into notebooks, pipelines and dataflows, a
 portability class per item, the order to create the items in, table names resolved to a lakehouse, findings
 PBI-25 and PBI-26: 12 reports, up to 100 CSV files, 26 findings.
@@ -177,13 +180,13 @@ param(
     [ValidateSet('Quick', 'Standard', 'Full', 'Migration', 'Security', 'Governance')]
     [string] $ReportProfile = 'Standard',
 
-    [ArgumentCompleter({ $a2cWord = [string]$args[2]; @('All', 'Analytics', 'PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'FabricCode', 'FabricStorage', 'PowerAutomate', 'PowerBIModels', 'PowerBIAdmin', 'PowerBIActivity', 'Principals', 'PowerBIExport') | Where-Object { $_ -like ($a2cWord + '*') } })]
+    [ArgumentCompleter({ $a2cWord = [string]$args[2]; @('All', 'Analytics', 'PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'FabricCode', 'ReportDefinitions', 'FabricStorage', 'PowerAutomate', 'PowerBIModels', 'PowerBIAdmin', 'PowerBIActivity', 'Principals', 'PowerBIExport') | Where-Object { $_ -like ($a2cWord + '*') } })]
     [string[]] $Reports,
 
-    [ArgumentCompleter({ $a2cWord = [string]$args[2]; @('All', 'Analytics', 'PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'FabricCode', 'FabricStorage', 'PowerAutomate', 'PowerBIModels', 'PowerBIAdmin', 'PowerBIActivity', 'Principals', 'PowerBIExport') | Where-Object { $_ -like ($a2cWord + '*') } })]
+    [ArgumentCompleter({ $a2cWord = [string]$args[2]; @('All', 'Analytics', 'PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'FabricCode', 'ReportDefinitions', 'FabricStorage', 'PowerAutomate', 'PowerBIModels', 'PowerBIAdmin', 'PowerBIActivity', 'Principals', 'PowerBIExport') | Where-Object { $_ -like ($a2cWord + '*') } })]
     [string[]] $AddReports,
 
-    [ArgumentCompleter({ $a2cWord = [string]$args[2]; @('All', 'Analytics', 'PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'FabricCode', 'FabricStorage', 'PowerAutomate', 'PowerBIModels', 'PowerBIAdmin', 'PowerBIActivity', 'Principals', 'PowerBIExport') | Where-Object { $_ -like ($a2cWord + '*') } })]
+    [ArgumentCompleter({ $a2cWord = [string]$args[2]; @('All', 'Analytics', 'PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'FabricCode', 'ReportDefinitions', 'FabricStorage', 'PowerAutomate', 'PowerBIModels', 'PowerBIAdmin', 'PowerBIActivity', 'Principals', 'PowerBIExport') | Where-Object { $_ -like ($a2cWord + '*') } })]
     [string[]] $SkipReports,
 
     [switch] $ListReports,
@@ -238,7 +241,7 @@ Set-StrictMode -Version 1.0
 
 #region ============================== 1. CONSTANTS AND CATALOGS ======================================
 
-$script:A2CVersion = '1.3.0'
+$script:A2CVersion = '1.4.0'
 $script:A2CBrand = [ordered]@{
     Tool    = 'powerbi2csv'
     Author  = 'Aleksandr Reznik'
@@ -272,7 +275,11 @@ $script:A2CReportCatalog = @(
     @{ Name = 'FabricCode';      Group = 'Analytics'; Speed = 'Slow';   OptIn = $true;  Perm = 'Contributor on the workspace (item definitions)'
        Files = 'PowerBI\exportIndex.csv, PowerBI\<workspace>\Notebook\<notebook>\notebook-content.py, PowerBI\<workspace>\<item type>\<item>\* (pipelines, dataflows, semantic models as TMDL, ...), PowerBI\<workspace>\dataflows\*.json, PowerBI\<workspace>\sql\<database>\*.sql'
        Needs = @('PbiWorkspaces', 'PowerBI', 'Fabric', 'FabricCode')
-       Desc  = 'Download of the code: notebooks, pipelines, dataflows, semantic model definitions and every other item type with a definition, plus the SQL of views and procedures when FabricSql runs. No report files and no data (that is PowerBIExport)' }
+       Desc  = 'Download of the code: notebooks, pipelines, dataflows, semantic model definitions and every other item type with a definition, plus the SQL of views and procedures when FabricSql runs. No reports (ReportDefinitions has their definitions, PowerBIExport the report files with data)' }
+    @{ Name = 'ReportDefinitions'; Group = 'Analytics'; Speed = 'Slow'; OptIn = $true;  Perm = 'Contributor on the workspace (item definitions)'
+       Files = 'PowerBI\reportFeatures.csv, PowerBI\exportIndex.csv, PowerBI\<workspace>\Report\<report>\* (definition.pbir, pages, visuals, bookmarks)'
+       Needs = @('PbiWorkspaces', 'PowerBI', 'Fabric', 'ReportDefinitions')
+       Desc  = 'Download of the definition of every report, without the report file and without data, and what each report uses: pages, visuals, bookmarks, report-level measures, custom visuals, drill-through and tooltip pages, and the semantic model it points to. The input for moving reports to another tenant' }
     @{ Name = 'FabricStorage';   Group = 'Analytics'; Speed = 'Slow';   OptIn = $true;  Perm = 'Read on the lakehouse or warehouse (OneLake)'
        Files = 'PowerBI\onelakeStorage.csv, onelakeTableSizes.csv'
        Needs = @('PbiWorkspaces', 'Fabric', 'FabricStorage')
@@ -310,7 +317,7 @@ $script:A2CProfiles = [ordered]@{
     Quick      = @('Fabric')
     Standard   = @('PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'PowerBIAdmin', 'Principals')
     Full       = @('All')
-    Migration  = @('PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'FabricCode', 'FabricStorage', 'PowerAutomate', 'PowerBIAdmin', 'PowerBIModels', 'Principals')
+    Migration  = @('PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'FabricCode', 'ReportDefinitions', 'FabricStorage', 'PowerAutomate', 'PowerBIAdmin', 'PowerBIModels', 'Principals')
     Security   = @('PowerBI', 'Fabric', 'PowerBIAdmin', 'PowerBIActivity', 'Principals')
     Governance = @('PowerBI', 'Fabric', 'FabricSql', 'Dependencies', 'PowerBIAdmin', 'Principals')
 }
@@ -324,6 +331,7 @@ $script:A2CDatasetCatalog = [ordered]@{
     FabricSql       = @{ Needs = @('PbiWorkspaces', 'Fabric');  Desc = 'Objects of lakehouse SQL endpoints and warehouses (catalog query over the SQL endpoint)' }
     ItemDefinitions = @{ Needs = @('PbiWorkspaces', 'PowerBI', 'Fabric'); Desc = 'Definitions of pipelines, notebooks, dataflows and semantic models (getDefinition, 20 at a time)' }
     FabricCode      = @{ Needs = @('PbiWorkspaces', 'PowerBI', 'Fabric'); Desc = 'Item definitions and SQL code written to files (download)' }
+    ReportDefinitions = @{ Needs = @('PbiWorkspaces', 'PowerBI', 'Fabric'); Desc = 'Report definitions written to files and read for what each report uses (getDefinition, 20 at a time)' }
     FabricStorage   = @{ Needs = @('PbiWorkspaces', 'Fabric');  Desc = 'OneLake file listing of lakehouse and warehouse tables' }
     PowerAutomate   = @{ Needs = @();                          Desc = 'Power Automate environments and flows (Power Automate REST)' }
     PowerBIModels   = @{ Needs = @('PbiWorkspaces', 'PowerBI'); Desc = 'Semantic model schema (DAX INFO.VIEW queries, 4 calls per model)' }
@@ -2613,6 +2621,151 @@ function Export-A2CPbiContent {
 function Get-A2CDatasetFabricCode { return (Export-A2CPbiContent -Area 'Fabric code download') }
 
 function Get-A2CDatasetPowerBIExport { return (Export-A2CPbiContent -WithReports -Area 'Power BI export') }
+
+# ---- Report definitions: the definition of every report, without the report file ----
+function Get-A2CPbiPartText {
+    # One part of an item definition as text; '' when it is missing or not readable. $Parts: path -> part.
+    param($Parts, [string] $Path)
+    $p = $Parts[$Path]
+    if ($null -eq $p) { return '' }
+    try { return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([string]$p.payload)).TrimStart([char]0xFEFF) } catch { return '' }
+}
+
+function Get-A2CPbiReportPageKind {
+    # 'Drillthrough', 'Tooltip' or '' from the pageBinding of a page: a name, or a number in older single-file reports.
+    param($Binding)
+    if ($null -eq $Binding) { return '' }
+    $t = [string]$Binding.type
+    if ($t -eq '1') { return 'Drillthrough' }
+    if ($t -eq '2') { return 'Tooltip' }
+    return $t
+}
+
+function Get-A2CPbiReportModelRef {
+    # The semantic model a report points to, from definition.pbir: workspace, model name and model ID.
+    param([string] $Pbir)
+    $ref = [ordered]@{ ModelWorkspace = ''; Model = ''; ModelId = ''; Reference = '' }
+    $doc = ConvertFrom-A2CJson $Pbir
+    if ($null -eq $doc -or $null -eq $doc.datasetReference) { return $ref }
+    $by = $doc.datasetReference.byConnection
+    if ($null -eq $by) {
+        if ($null -ne $doc.datasetReference.byPath) { $ref.Reference = 'Path'; $ref.Model = [string]$doc.datasetReference.byPath.path }
+        return $ref
+    }
+    $ref.Reference = 'Connection'
+    $cs = [string]$by.connectionString
+    if ($cs -match '(?i)semanticmodelid=([0-9a-f-]{36})') { $ref.ModelId = $Matches[1] }
+    elseif ($by.pbiModelDatabaseName) { $ref.ModelId = [string]$by.pbiModelDatabaseName }
+    if ($cs -match '(?i)initial catalog=(?:"((?:[^"]|"")*)"|([^;]*))') { $ref.Model = $(if ($Matches[1]) { $Matches[1].Replace('""', '"') } else { [string]$Matches[2] }) }
+    if ($cs -match '(?i)data source="?powerbi://[^/]+/v1\.0/[^/]+/([^";]*)') { $ref.ModelWorkspace = $Matches[1] }
+    return $ref
+}
+
+function Get-A2CPbiReportFeatures {
+    # What a report uses, read from its definition. Two layouts exist: one file per page and visual below
+    # definition/ (PBIR), and the older single file report.json.
+    param($Definition)
+    $parts = @{}
+    foreach ($p in @($Definition.parts)) { if ($null -ne $p -and $p.path) { $parts[([string]$p.path).Replace('\', '/')] = $p } }
+    $f = [ordered]@{ Layout = ''; Pages = 0; Visuals = 0; Bookmarks = 0; Measures = @(); Custom = @(); Drillthrough = 0; Tooltip = 0 }
+    $ref = Get-A2CPbiReportModelRef (Get-A2CPbiPartText $parts 'definition.pbir')
+    foreach ($k in $ref.Keys) { $f[$k] = $ref[$k] }
+    $kinds = [System.Collections.Generic.List[string]]::new()
+    $measures = [System.Collections.Generic.List[string]]::new()
+    $custom = [System.Collections.Generic.List[string]]::new()
+    $pagePaths = @($parts.Keys | Where-Object { $_ -match '^definition/pages/[^/]+/page\.json$' })
+    if ($pagePaths.Count -gt 0 -or $parts.ContainsKey('definition/report.json')) {
+        $f.Layout = 'One file per page'
+        $f.Pages = $pagePaths.Count
+        $f.Visuals = @($parts.Keys | Where-Object { $_ -match '^definition/pages/[^/]+/visuals/[^/]+/visual\.json$' }).Count
+        $f.Bookmarks = @($parts.Keys | Where-Object { $_ -match '^definition/bookmarks/[^/]+\.bookmark\.json$' }).Count
+        foreach ($pp in $pagePaths) {
+            $page = ConvertFrom-A2CJson (Get-A2CPbiPartText $parts $pp)
+            if ($null -ne $page) { $kinds.Add((Get-A2CPbiReportPageKind $page.pageBinding)) }
+        }
+        $ext = ConvertFrom-A2CJson (Get-A2CPbiPartText $parts 'definition/reportExtensions.json')
+        if ($null -ne $ext) { foreach ($e in @($ext.entities)) { foreach ($m in @($e.measures)) { if ($null -ne $m) { $measures.Add(([string]$e.name + '[' + [string]$m.name + ']')) } } } }
+        $rep = ConvertFrom-A2CJson (Get-A2CPbiPartText $parts 'definition/report.json')
+        if ($null -ne $rep) {
+            foreach ($v in @($rep.publicCustomVisuals)) { if ($v) { $custom.Add([string]$v) } }
+            foreach ($rp in @($rep.resourcePackages)) { if ($null -ne $rp -and [string]$rp.type -in @('CustomVisual', '0') -and $rp.name) { $custom.Add([string]$rp.name) } }
+        }
+    }
+    elseif ($parts.ContainsKey('report.json')) {
+        $f.Layout = 'Single file'
+        $rep = ConvertFrom-A2CJson (Get-A2CPbiPartText $parts 'report.json')
+        if ($null -eq $rep) { throw 'report.json is not readable' }
+        $sections = @($rep.sections | Where-Object { $null -ne $_ })
+        $f.Pages = $sections.Count
+        foreach ($sec in $sections) {
+            $f.Visuals += @($sec.visualContainers | Where-Object { $null -ne $_ }).Count
+            $sc = $(if ($sec.config) { ConvertFrom-A2CJson ([string]$sec.config) } else { $null })
+            if ($null -ne $sc) { $kinds.Add((Get-A2CPbiReportPageKind $sc.pageBinding)) }
+        }
+        $cfg = $(if ($rep.config) { ConvertFrom-A2CJson ([string]$rep.config) } else { $null })
+        if ($null -ne $cfg) {
+            $f.Bookmarks = @($cfg.bookmarks | Where-Object { $null -ne $_ }).Count
+            foreach ($x in @($cfg.modelExtensions)) { if ($null -eq $x) { continue }; foreach ($e in @($x.entities)) { foreach ($m in @($e.measures)) { if ($null -ne $m) { $measures.Add(([string]$e.name + '[' + [string]$m.name + ']')) } } } }
+        }
+        foreach ($v in @($rep.publicCustomVisuals)) { if ($v) { $custom.Add([string]$v) } }
+        foreach ($rp in @($rep.resourcePackages)) {
+            $pkg = $(if ($null -ne $rp) { $rp.resourcePackage } else { $null })
+            if ($null -ne $pkg -and [string]$pkg.type -eq '0' -and $pkg.name) { $custom.Add([string]$pkg.name) }
+        }
+    }
+    else { throw 'neither definition/pages nor report.json in the definition' }
+    $f.Measures = @($measures)
+    $f.Custom = @($custom | Sort-Object -Unique)
+    $f.Drillthrough = @($kinds | Where-Object { $_ -eq 'Drillthrough' }).Count
+    $f.Tooltip = @($kinds | Where-Object { $_ -eq 'Tooltip' }).Count
+    return $f
+}
+
+function Get-A2CDatasetReportDefinitions {
+    # getDefinition of every report: written to PowerBI/<workspace>/Report/<report> and read for reportFeatures.csv.
+    # No report file (.pbix) is downloaded, so no data leaves the tenant.
+    Initialize-A2CPbiExport
+    $done = $script:A2C.Data['PbiExportDone']
+    $feat = [System.Collections.Generic.List[object]]::new()
+    $script:A2C.Data['PbiReportFeatures'] = $feat
+    $todo = [System.Collections.Generic.List[object]]::new()
+    foreach ($w in @($script:A2C.Data['PbiWorkspaces'])) {
+        foreach ($x in $w.Items) { if ([string]$x.type -eq 'Report' -and -not $done.ContainsKey([string]$x.id)) { $todo.Add([pscustomobject]@{ Ws = $w; Item = $x }) } }
+    }
+    $ok = 0
+    $first = ''
+    $size = 20
+    $t0 = [DateTime]::Now
+    for ($i = 0; $i -lt $todo.Count; $i += $size) {
+        Write-A2CProgress -Activity 'Report definitions' -Current $i -Total $todo.Count -Started $t0 -Item ([string]$todo[$i].Ws.Name)
+        $chunk = @($todo[$i..([math]::Min($i + $size - 1, $todo.Count - 1))])
+        $res = Invoke-A2CFabricLroBatch -Paths @($chunk | ForEach-Object { Get-A2CPbiDefinitionPath $_.Ws $_.Item })
+        for ($k = 0; $k -lt $chunk.Count; $k++) {
+            $c = $chunk[$k]
+            $r = $res[$k]
+            Save-A2CPbiDefinitionParts $c.Ws $c.Item $r
+            $row = [pscustomobject]@{ Ws = $c.Ws; Item = $c.Item; Features = $null; Status = ''; Detail = '' }
+            if ($r.Ok) {
+                $ok++
+                try { $row.Features = Get-A2CPbiReportFeatures $r.Json.definition; $row.Status = 'Read' }
+                catch { $row.Status = 'Not read'; $row.Detail = Get-A2CShortText $_.Exception.Message 200 }
+            }
+            else {
+                $row.Status = 'Not exported'
+                $row.Detail = Get-A2CShortText (Get-A2CErrorText $r.Error) 200
+                if (-not $first) { $first = ('{0} / {1}: {2}' -f $c.Ws.Name, $c.Item.displayName, (Get-A2CShortText (Get-A2CErrorText $r.Error) 140)) }
+            }
+            $feat.Add($row)
+        }
+    }
+    Write-A2CProgress -Activity 'Report definitions' -Completed
+    $note = '{0} of {1} report definitions exported' -f $ok, $todo.Count
+    if ($first) { $note += '; first failure: ' + $first }
+    $status = $(if ($ok -lt $todo.Count) { 'Partial' } else { 'Collected' })
+    Add-A2CCoverage -Area 'Report definitions' -Status $status -Items $ok -Detail $note
+    Write-A2CLog -Level Ok ('Report definitions: ' + $note)
+    return New-A2CDatasetResult -Status $status -Note $note
+}
 # ---- end Power BI ----
 
 #endregion
@@ -5507,6 +5660,31 @@ function New-A2CReportPowerBIExport {
     }
     Add-A2CRows 'PowerBI/exportIndex.csv' $rows
 }
+
+Register-A2CSchema 'PowerBI/reportFeatures.csv' ($script:A2CPbiWs + 'Report:name ReportId:guid Status Layout Pages:num Visuals:num Bookmarks:num ReportMeasures:num ReportMeasureNames:note ' +
+    'CustomVisuals:num CustomVisualNames:note DrillthroughPages:num TooltipPages:num ModelReference ModelWorkspace:name Model:name ModelId:guid DefinitionPath:path Detail:note')
+
+function New-A2CReportReportDefinitions {
+    New-A2CReportPowerBIExport   # the shared exportIndex.csv
+    $rows = [System.Collections.Generic.List[object]]::new()
+    foreach ($x in @($script:A2C.Data['PbiReportFeatures'])) {
+        if ($null -eq $x) { continue }
+        $f = $x.Features
+        $id = [string]$x.Item.id
+        $v = [ordered]@{ Report = [string]$x.Item.displayName; ReportId = $id; Status = $x.Status; Layout = ''; Pages = $null; Visuals = $null; Bookmarks = $null
+            ReportMeasures = $null; ReportMeasureNames = ''; CustomVisuals = $null; CustomVisualNames = ''; DrillthroughPages = $null; TooltipPages = $null
+            ModelReference = ''; ModelWorkspace = ''; Model = ''; ModelId = ''; DefinitionPath = $(if ($x.Status -ne 'Not exported') { Get-A2CPbiExportDir $x.Ws 'Report' ([string]$x.Item.displayName) } else { '' }); Detail = $x.Detail }
+        if ($null -ne $f) {
+            $v.Layout = $f.Layout; $v.Pages = $f.Pages; $v.Visuals = $f.Visuals; $v.Bookmarks = $f.Bookmarks
+            $v.ReportMeasures = @($f.Measures).Count; $v.ReportMeasureNames = (@($f.Measures) -join '; ')
+            $v.CustomVisuals = @($f.Custom).Count; $v.CustomVisualNames = (@($f.Custom) -join '; ')
+            $v.DrillthroughPages = $f.Drillthrough; $v.TooltipPages = $f.Tooltip
+            $v.ModelReference = $f.Reference; $v.ModelWorkspace = $f.ModelWorkspace; $v.Model = $f.Model; $v.ModelId = $f.ModelId
+        }
+        $rows.Add((New-A2CPbiRow $x.Ws $v))
+    }
+    Add-A2CRows 'PowerBI/reportFeatures.csv' $rows
+}
 # ---- end Power BI ----
 
 #endregion
@@ -5787,6 +5965,27 @@ Register-A2CFinding -Id 'PBI-26' -Severity Medium -Category Migration -Title 'No
     -Recommendation 'Class Refactor in itemPortability.csv: the code holds IDs or OneLake paths of another workspace or environment (hardcodedReferences.csv lists them). Every one of them changes in the target tenant; move them into parameters or a variable library before the move.' `
     -Url 'https://learn.microsoft.com/fabric/cicd/variable-library/variable-library-overview' -Evaluate {
     $x = @((Get-A2CRows 'PowerBI/itemPortability.csv') | Where-Object { $_['Class'] -eq 'Refactor' })
+    New-A2CFindingResult $x.Count (Get-A2CTopText @($x | ForEach-Object { $_['Workspace'] }) 8)
+}
+
+Register-A2CFinding -Id 'PBI-27' -Severity Low -Category Migration -Title 'Reports with report-level measures' -Needs @('ReportDefinitions') -File 'PowerBI/reportFeatures.csv' `
+    -Recommendation 'These measures are stored in the report, not in the semantic model, and use the table and column names of the model. They move with the report definition. After a move, open each of these reports and check the visuals that use the measures in ReportMeasureNames.' `
+    -Url 'https://learn.microsoft.com/power-bi/connect-data/desktop-report-lifecycle-datasets' -Evaluate {
+    $x = @((Get-A2CRows 'PowerBI/reportFeatures.csv') | Where-Object { [int]$_['ReportMeasures'] -gt 0 })
+    New-A2CFindingResult $x.Count (Get-A2CTopText @($x | ForEach-Object { $_['Workspace'] }) 8)
+}
+
+Register-A2CFinding -Id 'PBI-28' -Severity Low -Category Migration -Title 'Reports with custom visuals' -Needs @('ReportDefinitions') -File 'PowerBI/reportFeatures.csv' `
+    -Recommendation 'A custom visual renders only where the tenant allows it. Give the names in the Detail column (CustomVisualNames per report) to the administrator of the target tenant before the reports move, so that the visuals are allowed or added as organizational visuals.' `
+    -Url 'https://learn.microsoft.com/power-bi/admin/organizational-visuals' -Evaluate {
+    $x = @((Get-A2CRows 'PowerBI/reportFeatures.csv') | Where-Object { [int]$_['CustomVisuals'] -gt 0 })
+    New-A2CFindingResult $x.Count (Get-A2CTopText @($x | ForEach-Object { ([string]$_['CustomVisualNames']) -split '; ' } | Where-Object { $_ }) 10)
+}
+
+Register-A2CFinding -Id 'PBI-29' -Severity Info -Category Migration -Title 'Reports without visuals' -Needs @('ReportDefinitions') -File 'PowerBI/reportFeatures.csv' `
+    -Recommendation 'Reports that have pages but no visual. Most are the blank report that is created when only a semantic model is published from Power BI Desktop. Confirm with the owner that they are not needed and leave them out of a move.' `
+    -Url 'https://learn.microsoft.com/power-bi/create-reports/desktop-upload-desktop-files' -Evaluate {
+    $x = @((Get-A2CRows 'PowerBI/reportFeatures.csv') | Where-Object { $_['Status'] -eq 'Read' -and [int]$_['Visuals'] -eq 0 })
     New-A2CFindingResult $x.Count (Get-A2CTopText @($x | ForEach-Object { $_['Workspace'] }) 8)
 }
 # ---- end Power BI ----
