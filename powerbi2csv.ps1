@@ -4624,7 +4624,7 @@ function New-A2CPbiWorkspacePlan {
         foreach ($w in $all) { if ((& $norm $w.Name) -eq (& $norm $name)) { $hit = $w; break } }
         if ($null -ne $hit -and $hit.Name -ne $name) { $status = 'Found (spelled differently)' }
         if ($null -eq $hit) {
-            # closest name within a few typing errors, e.g. "Finance Wld" for "Finance Wild"
+            # closest name within a few typing errors, e.g. "Marketng" for "Marketing"
             $best = 99
             foreach ($w in $all) {
                 if ($used.ContainsKey($w.Id)) { continue }
